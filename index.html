@@ -6,9 +6,12 @@
 <title>でんしゃにのろう</title>
 <style>
   :root{
-    --blue:#1a6fb5; --blue-d:#0d4f85; --red:#d34040; --green:#2e8b57;
+    --blue:#1a6fb5; --blue-d:#0d4f85; --green:#2e8b57;
     --bg:#eef4fa; --card:#ffffff; --ink:#22303c; --dim:#8b98a5;
-    --yellow:#f5c542;
+    --yellow:#f5c542; --accent:#d97a3a;   /* 赤の代わりの暖色アクセント */
+    --up:#3d87c9; --down:#e08a3c;         /* 上り/下りの色分け */
+    --banner:#eaf3fb; --banner-b:#a9cbe8; /* 明るく他要素と馴染む案内色 */
+    --banner2:#eef7f0; --banner2-b:#a9d6b6;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;height:100%;}
@@ -19,7 +22,7 @@
     overscroll-behavior:none;
   }
   ruby rt{font-size:0.45em; color:inherit; opacity:.85;}
-  #app{max-width:760px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;}
+  #app{max-width:800px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;}
 
   /* header */
   #hdr{
@@ -51,80 +54,108 @@
   button.big{font-size:1.3rem; padding:16px 24px; width:100%;}
   button.ghost{background:#e7eef5; color:var(--blue-d);}
   button.green{background:var(--green);}
-  button.warn{background:var(--red);}
+  button.accent{background:var(--accent);}
 
-  /* banner */
+  /* banner（黒・赤をやめ、明るく馴染む配色に統一） */
   .banner{
-    background:#fff8e0; border:2px solid var(--yellow); border-radius:12px;
-    padding:10px 12px; font-size:1.05rem;
+    background:var(--banner); border:2px solid var(--banner-b); border-radius:12px;
+    padding:10px 12px; font-size:1.05rem; color:var(--ink);
   }
-  .banner.info{background:#e8f2fc; border-color:var(--blue);}
+  .banner.alt{background:var(--banner2); border-color:var(--banner2-b);}
+
+  /* route map（リアルモード：時刻表の上に常時表示） */
+  #linemap-wrap{display:none;}
+  #linemap-wrap.show{display:block;}
+  #linemap{position:relative; padding:22px 6px 8px;}
+  #linemap .lm-line{position:absolute; left:4%; right:4%; top:30px; height:6px; background:var(--blue); border-radius:3px;}
+  #linemap .lm-row{display:flex; align-items:flex-start; justify-content:space-between;}
+  .lm-sta{position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:4px; width:13%;}
+  .lm-sta .dot{width:16px; height:16px; border-radius:50%; background:#fff; border:4px solid var(--blue);}
+  .lm-sta.expstop .dot{border-color:var(--accent); background:#fdf1e6;}
+  .lm-sta .nm{font-size:.58rem; text-align:center; line-height:1.15; word-break:keep-all;}
+  .lm-sta.here .dot{background:var(--yellow); box-shadow:0 0 0 5px rgba(245,197,66,.45);}
+  .lm-sta.dest .nm{font-weight:bold; color:var(--blue-d);}
+  .lm-sta.dest .dot{box-shadow:0 0 0 4px rgba(217,122,58,.35);}
+  .lm-legend{display:flex; gap:12px; flex-wrap:wrap; font-size:.85rem; padding-top:8px; align-items:center;}
+  .lm-legend .lg{display:inline-flex; align-items:center; gap:5px;}
+  .lm-legend .sw{width:16px;height:16px;border-radius:50%;background:#fff;border:4px solid var(--blue);}
+  .lm-legend .sw.exp{border-color:var(--accent); background:#fdf1e6;}
+  .lm-legend .sw.hereex{background:var(--yellow);}
 
   /* timetable */
   .tt-tabs{display:flex; gap:8px;}
   .tt-tabs button{flex:1; background:#dfe8f0; color:var(--ink); box-shadow:none;}
   .tt-tabs button.act{background:var(--blue); color:#fff;}
+  .tt-dual{display:flex; gap:12px; flex-wrap:wrap;}
+  .tt-daycol{flex:1; min-width:260px;}
+  .tt-daycol h4{
+    margin:0 0 6px; background:#dfe8f0; color:var(--blue-d); padding:6px 10px;
+    border-radius:8px; font-size:.95rem; text-align:center;
+  }
   .tt-dir{margin-top:10px;}
   .tt-dir h3{
-    margin:0; background:var(--blue-d); color:#fff; padding:8px 10px;
-    border-radius:10px 10px 0 0; font-size:1.05rem;
+    margin:0; padding:8px 10px; border-radius:10px 10px 0 0; font-size:1.05rem; color:#fff;
   }
-  .tt-grid{border:2px solid var(--blue-d); border-top:none; border-radius:0 0 10px 10px; overflow:hidden; background:#fff;}
+  .tt-dir.up h3{background:var(--up);}
+  .tt-dir.down h3{background:var(--down);}
+  .tt-grid{border:2px solid #cdd8e2; border-top:none; border-radius:0 0 10px 10px; overflow:hidden; background:#fff;}
   .tt-row{display:flex; border-bottom:1px solid #dde5ec;}
   .tt-row:last-child{border-bottom:none;}
   .tt-hour{
-    width:52px; flex:0 0 52px; background:#f0f5fa; display:flex; align-items:center; justify-content:center;
-    font-weight:bold; font-size:1.1rem; border-right:2px solid #cdd8e2; font-variant-numeric:tabular-nums;
+    width:44px; flex:0 0 44px; background:#f0f5fa; display:flex; align-items:center; justify-content:center;
+    font-weight:bold; font-size:1rem; border-right:2px solid #cdd8e2; font-variant-numeric:tabular-nums;
   }
   .tt-mins{display:flex; flex-wrap:wrap; gap:6px; padding:6px 8px; flex:1;}
   .tt-cell{
-    min-width:48px; min-height:44px; padding:4px 8px; border-radius:8px;
-    background:#f2f6fa; color:var(--ink); font-weight:bold; font-size:1.05rem;
+    min-width:46px; min-height:44px; padding:4px 6px; border-radius:8px;
+    background:#f2f6fa; color:var(--ink); font-weight:bold; font-size:1rem;
     box-shadow:inset 0 0 0 1px #ccd7e1; font-variant-numeric:tabular-nums;
     display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.1;
   }
-  .tt-cell .k{font-size:.6rem; font-weight:normal;}
-  .tt-cell.exp{background:#fdecec; color:var(--red); box-shadow:inset 0 0 0 2px var(--red);}
+  .tt-cell .k{font-size:.58rem; font-weight:normal;}
+  .tt-cell.exp{background:#fdf1e6; color:#a3591a; box-shadow:inset 0 0 0 2px var(--accent);}
   .tt-cell.past{opacity:.35;}
   .tt-legend{display:flex; gap:14px; padding:8px 4px; font-size:.9rem; align-items:center; flex-wrap:wrap;}
   .lg{display:inline-flex; align-items:center; gap:5px;}
   .lg .sw{width:20px;height:20px;border-radius:5px; background:#f2f6fa; box-shadow:inset 0 0 0 1px #ccd7e1;}
-  .lg .sw.exp{background:#fdecec; box-shadow:inset 0 0 0 2px var(--red);}
+  .lg .sw.exp{background:#fdf1e6; box-shadow:inset 0 0 0 2px var(--accent);}
 
-  /* platform */
+  /* platform：上り/下りで線路を分ける */
   #plat-scene{
-    position:relative; height:190px; border-radius:12px; overflow:hidden;
-    background:linear-gradient(#bfe0f7 0 55%, #9aa7b1 55% 70%, #e8e2d5 70% 100%);
+    position:relative; border-radius:12px; overflow:hidden;
+    background:#bfe0f7;
   }
-  #plat-line{position:absolute; left:0; right:0; top:64%; height:5px; background:#555;}
-  #train{
-    position:absolute; top:34%; left:110%; width:300px; height:64px; transition:left 1.1s ease-out;
-    display:flex; align-items:stretch; gap:3px;
-  }
-  #train .carbody{flex:1; background:#3d87c9; border-radius:10px; position:relative; border-bottom:8px solid #2a5d8c;}
-  #train.exp .carbody{background:#d34040; border-bottom-color:#8c2a2a;}
-  #train .carbody::before{content:""; position:absolute; left:8%; right:8%; top:18%; height:38%; background:#dff0fb; border-radius:5px;}
-  #train-label{
-    position:absolute; top:8%; left:0; right:0; text-align:center; font-weight:bold; font-size:1.05rem;
-    color:#123; text-shadow:0 1px 0 #fff;
-  }
-  #plat-mark{position:absolute; bottom:8%; left:50%; transform:translateX(-50%); font-size:.9rem; background:#fff; border-radius:8px; padding:3px 10px;}
+  .plat-track{position:relative; height:110px; background:linear-gradient(#bfe0f7 0 40%, #9aa7b1 40% 58%, #e8e2d5 58% 100%);}
+  .plat-track + .plat-track{border-top:3px dashed #fff;}
+  .plat-track .tk-label{position:absolute; top:4px; left:8px; font-size:.8rem; background:#fff; border-radius:6px; padding:2px 8px; z-index:2;}
+  .plat-track .tk-line{position:absolute; left:0; right:0; top:46%; height:5px; background:#555;}
+  .plat-track .tk-train{position:absolute; top:6%; left:110%; width:230px; height:56px; transition:left 1.1s ease-out; display:flex; gap:3px;}
+  .plat-track .tk-train.up{flex-direction:row-reverse;}
+  .tk-train .carbody{flex:1; background:var(--blue); border-radius:10px; position:relative; border-bottom:8px solid #2a5d8c;}
+  .plat-track.dir-up .tk-train .carbody{background:var(--up); border-bottom-color:#2a5d8c;}
+  .plat-track.dir-down .tk-train .carbody{background:var(--down); border-bottom-color:#a15b1f;}
+  .tk-train.exp .carbody{box-shadow:inset 0 0 0 3px #a3591a;}
+  .tk-train .carbody::before{content:""; position:absolute; left:8%; right:8%; top:18%; height:38%; background:#dff0fb; border-radius:5px;}
+  .tk-label-run{position:absolute; top:62%; left:0; right:0; text-align:center; font-size:.85rem; font-weight:bold; color:#123; text-shadow:0 1px 0 #fff;}
+  #plat-mark{padding:6px 10px; font-size:.9rem; background:#fff; text-align:center;}
   .btnrow{display:flex; gap:10px; flex-wrap:wrap;}
   .btnrow button{flex:1;}
+  .pip{display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--yellow); margin:0 2px; animation:pipfade 1s ease-in-out infinite;}
+  @keyframes pipfade{0%,100%{opacity:.3;}50%{opacity:1;}}
 
   /* ride */
   #route{display:flex; align-items:center; justify-content:space-between; padding:26px 6px 6px; position:relative;}
   #route .rline{position:absolute; left:4%; right:4%; top:36px; height:6px; background:var(--blue); border-radius:3px;}
   .sta{position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:4px; width:13%;}
   .sta .dot{width:18px; height:18px; border-radius:50%; background:#fff; border:4px solid var(--blue);}
-  .sta.expstop .dot{border-color:var(--red);}
+  .sta.expstop .dot{border-color:var(--accent);}
   .sta .nm{font-size:.62rem; text-align:center; line-height:1.15; word-break:keep-all;}
   .sta.target .dot{background:var(--yellow);}
   .sta.here .dot{box-shadow:0 0 0 5px rgba(245,197,66,.55);}
   #ride-train{position:absolute; top:-2px; font-size:1.7rem; transition:left .9s ease; z-index:2;}
   #announce{
-    min-height:74px; background:#12233a; color:#ffe9a8; border-radius:12px;
-    display:flex; align-items:center; justify-content:center; text-align:center;
+    min-height:74px; background:var(--banner); border:2px solid var(--banner-b); color:var(--ink);
+    border-radius:12px; display:flex; align-items:center; justify-content:center; text-align:center;
     font-size:1.25rem; padding:10px; line-height:1.5;
   }
 
@@ -144,12 +175,12 @@
 
   /* modal */
   #modal-bg{
-    position:fixed; inset:0; background:rgba(10,25,45,.55); display:none;
+    position:fixed; inset:0; background:rgba(10,25,45,.5); display:none;
     align-items:center; justify-content:center; z-index:50; padding:18px;
   }
   #modal-bg.on{display:flex;}
   #modal{
-    background:#fff; border-radius:16px; padding:20px; max-width:440px; width:100%;
+    background:#fff; border-radius:16px; padding:20px; max-width:460px; width:100%;
     display:flex; flex-direction:column; gap:14px; text-align:center;
   }
   #modal-text{font-size:1.15rem; line-height:1.7;}
@@ -171,7 +202,7 @@
     <p class="center note">ひとりで でんしゃに のる れんしゅうを しよう</p>
     <div class="card modebtns">
       <button class="big" id="btn-mode-normal">ふつうモード<br><span style="font-size:.85rem;font-weight:normal">かくえきていしゃ だけ。ゆっくり れんしゅう</span></button>
-      <button class="big warn" id="btn-mode-real">リアルモード<br><span style="font-size:.85rem;font-weight:normal"><ruby>急行<rt>きゅうこう</rt></ruby>や <ruby>方向<rt>ほうこう</rt></ruby>も じぶんで えらぶ</span></button>
+      <button class="big accent" id="btn-mode-real">リアルモード<br><span style="font-size:.85rem;font-weight:normal"><ruby>急行<rt>きゅうこう</rt></ruby>や <ruby>方向<rt>ほうこう</rt></ruby>も じぶんで えらぶ</span></button>
     </div>
   </div>
 
@@ -187,8 +218,13 @@
   <!-- 時刻表 -->
   <div class="screen" id="s-tt">
     <div class="banner" id="tt-banner"></div>
+    <div class="card" id="linemap-wrap">
+      <h2 style="margin-top:0">🗺️ <ruby>路線図<rt>ろせんず</rt></ruby></h2>
+      <div id="linemap"></div>
+      <div class="lm-legend" id="lm-legend"></div>
+    </div>
     <div class="card">
-      <div class="tt-tabs">
+      <div class="tt-tabs" id="tt-tabs">
         <button id="tab-weekday">📅 <ruby>平日<rt>へいじつ</rt></ruby></button>
         <button id="tab-weekend">🌞 <ruby>土日<rt>どにち</rt></ruby></button>
       </div>
@@ -196,35 +232,46 @@
       <div id="tt-body"></div>
     </div>
     <p class="note center">のりたい <ruby>時刻<rt>じこく</rt></ruby>を タップしてね</p>
+    <div class="btnrow" id="tt-backrow" style="display:none">
+      <button class="ghost" id="btn-back-platform">◀ もとの ホームに もどる</button>
+    </div>
   </div>
 
   <!-- ホーム -->
   <div class="screen" id="s-platform">
-    <div class="banner info" id="plat-banner"></div>
+    <div class="banner alt" id="plat-banner"></div>
     <div id="plat-scene">
-      <div id="plat-line"></div>
-      <div id="train"><div class="carbody"></div><div class="carbody"></div><div class="carbody"></div></div>
-      <div id="train-label"></div>
+      <div class="plat-track" id="track-up">
+        <div class="tk-label">⬅️ <ruby>上<rt>のぼ</rt></ruby>り <span id="up-dest-label"></span></div>
+        <div class="tk-line"></div>
+        <div class="tk-train up" id="train-up"><div class="carbody"></div><div class="carbody"></div><div class="carbody"></div></div>
+        <div class="tk-label-run" id="train-up-label"></div>
+      </div>
+      <div class="plat-track" id="track-down">
+        <div class="tk-label">➡️ <ruby>下<rt>くだ</rt></ruby>り <span id="down-dest-label"></span></div>
+        <div class="tk-line"></div>
+        <div class="tk-train down" id="train-down"><div class="carbody"></div><div class="carbody"></div><div class="carbody"></div></div>
+        <div class="tk-label-run" id="train-down-label"></div>
+      </div>
       <div id="plat-mark"></div>
     </div>
     <div class="btnrow">
       <button class="big green" id="btn-board" disabled>🚪 のる</button>
     </div>
     <div class="btnrow">
-      <button class="ghost" id="btn-ff">⏩ <ruby>早送<rt>はやおく</rt></ruby>り</button>
       <button class="ghost" id="btn-open-tt">📋 <ruby>時刻表<rt>じこくひょう</rt></ruby>を<ruby>見<rt>み</rt></ruby>る</button>
     </div>
   </div>
 
   <!-- 乗車中 -->
   <div class="screen" id="s-ride">
-    <div class="banner info" id="ride-banner"></div>
+    <div class="banner alt" id="ride-banner"></div>
     <div class="card">
       <div id="route"></div>
     </div>
     <div id="announce"></div>
     <div class="btnrow">
-      <button class="big warn" id="btn-alight" disabled>🚪 おりる</button>
+      <button class="big accent" id="btn-alight" disabled>🚪 おりる</button>
     </div>
   </div>
 
@@ -293,19 +340,42 @@ function rb(i){const s=STATIONS[i];return `<ruby>${s.n}<rt>${s.k}</rt></ruby>`;}
 function dirRb(dir){return `<ruby>${DIR_NAME[dir]}<rt>${DIR_NAME[dir+'_k']}</rt></ruby>`;}
 function typeRb(t){return t==='exp' ? '<ruby>急行<rt>きゅうこう</rt></ruby>' : '<ruby>各停<rt>かくてい</rt></ruby>';}
 
-/* 時刻表パターン（毎時の分） */
+/* 時刻表パターン：10:00〜16:00、1時間最大5本、時間帯で緩急をつける
+   ラッシュ想定なしのお出かけ利用なので、
+   10-11時台・15-16時台は本数少なめ（2-3本）、12-14時台は多め（4-5本）にする */
+const HOURS = [10,11,12,13,14,15];  // 各時0分〜次時0分の枠。16:xxは無し（16:00で最終想定）
+
+// 分割パターン定義：時間帯ごとの本数を変える（種別込みで最大5本/時）
 const PAT = {
-  weekday:{ up:{local:[4,19,34,49], exp:[12,42]}, down:{local:[9,24,39,54], exp:[27,57]} },
-  weekend:{ up:{local:[8,38],       exp:[28]},    down:{local:[18,48],      exp:[58]} },
+  weekday:{
+    up:{
+      local:{10:[6,36],       11:[10,30,50],  12:[5,20,35,50], 13:[8,24,40,56], 14:[12,32,52],  15:[15,45]},
+      exp:  {10:[],           11:[],          12:[42],         13:[],          14:[],          15:[]},
+    },
+    down:{
+      local:{10:[9,39],       11:[13,33,53],  12:[3,18,33,48], 13:[11,27,43,59],14:[16,36,56],  15:[19,49]},
+      exp:  {10:[],           11:[],          12:[],           13:[],          14:[44],        15:[]},
+    },
+  },
+  weekend:{
+    up:{
+      local:{10:[20,50],      11:[25,55],     12:[10,30,50],   13:[10,40],     14:[15,45],     15:[30]},
+      exp:  {10:[],           11:[],          12:[],           13:[25],        14:[],          15:[]},
+    },
+    down:{
+      local:{10:[5,35],       11:[15,45],     12:[0,25,50],    13:[20,50],     14:[5,35],      15:[10,40]},
+      exp:  {10:[],           11:[],          12:[40],         13:[],          14:[],          15:[]},
+    },
+  },
 };
-const HOURS = []; for(let h=6;h<=22;h++) HOURS.push(h);
 function fullSchedule(day){
   const out=[];
-  for(const h of HOURS) for(const dir of ['up','down']) for(const type of ['local','exp'])
-    for(const m of PAT[day][dir][type]) out.push({time:h*60+m, dir, type});
+  for(const dir of ['up','down']) for(const type of ['local','exp'])
+    for(const h of HOURS) for(const m of (PAT[day][dir][type][h]||[])) out.push({time:h*60+m, dir, type});
   out.sort((a,b)=>a.time-b.time);
   return out;
 }
+const DAY_START=10*60, DAY_END=16*60;
 
 /* ============ ゲーム状態 ============ */
 const G = {
@@ -313,12 +383,14 @@ const G = {
   curSta:HOME, dest:null,
   trip:null,                 // {phase:'out'|'back', to}
   planned:null,              // {time,dir,type,exists}
-  ttTab:'weekday',
-  platform:{train:null, timer:0},
+  ttTab:'weekday',           // ふつうモードのみ使用（リアルモードは両方常時表示）
+  fromPlatform:false,        // 「時刻表を見る」がホームから開かれたか（戻れるかどうか）
+  platform:{up:null, down:null, upTimer:0, downTimer:0},
   ride:null,
   errand:{timer:0, done:false},
   counters:{miss:0, over:0, type:0, dir:0},
   modalOpen:false,
+  pip:{on:false, next:0},
 };
 window.__G = G;
 
@@ -326,7 +398,7 @@ window.__G = G;
 function initRandom(){
   const cands=[0,1,2,4,5,6];
   G.dest = P.has('dest') ? parseInt(P.get('dest'),10) : cands[Math.floor(rng()*cands.length)];
-  G.clock = P.has('start') ? parseInt(P.get('start'),10) : 8*60+30 + Math.floor(rng()*300); // 8:30〜13:30
+  G.clock = P.has('start') ? parseInt(P.get('start'),10) : DAY_START + Math.floor(rng()*180); // 10:00〜13:00
   G.startClock = G.clock;
 }
 function forcedDay(){ return P.get('day'); }
@@ -350,6 +422,7 @@ const sndDoor = ()=>{tone(660,0.15,'sine',.12);tone(880,0.2,'sine',.1,0.15);};  
 const sndChime= ()=>{tone(784,0.25,'sine',.12);tone(988,0.3,'sine',.12,0.22);};      // アナウンスチャイム
 const sndSoft = ()=>{tone(440,0.3,'sine',.1);tone(392,0.4,'sine',.1,0.25);};          // 優しい通知
 const sndGood = ()=>{tone(523,0.15,'sine',.12);tone(659,0.15,'sine',.12,0.15);tone(784,0.3,'sine',.12,0.3);};
+const sndPip  = ()=>{tone(1046,0.06,'square',.05);};                                  // 早送りピッ
 
 /* ============ 画面切替 ============ */
 const SCREENS=['s-mode','s-day','s-tt','s-platform','s-ride','s-errand','s-result'];
@@ -358,7 +431,6 @@ function show(id){ for(const s of SCREENS) $('#'+s).classList.toggle('on', s===i
 function updateHdr(){
   $('#hdr-clock').textContent = fmt(G.clock);
   if(G.dayType){
-    const d = G.dayType==='weekday' ? '7月10日（金）' : '7月11日（土）';
     $('#hdr-date').innerHTML = `<ruby>7月<rt>がつ</rt></ruby>${G.dayType==='weekday'?'10':'11'}<ruby>日<rt>にち</rt></ruby>（${G.dayType==='weekday'?'<ruby>金<rt>きん</rt></ruby>':'<ruby>土<rt>ど</rt></ruby>'}）`;
   } else $('#hdr-date').textContent='';
   $('#hdr-where').innerHTML = G.state==='MODE'||G.state==='DAY' ? '' :
@@ -395,22 +467,48 @@ $('#btn-day-weekend').addEventListener('click',()=>{ G.dayType='weekend'; startG
 function startGame(){
   initRandom();
   G.trip={phase:'out', to:G.dest};
-  G.ttTab = G.mode==='normal' ? G.dayType : 'weekday';
   modal('start','🎒',
     `きょうは ${rb(G.dest)}<ruby>駅<rt>えき</rt></ruby>の <ruby>近<rt>ちか</rt></ruby>くに おでかけ！<br>` +
     `${rb(HOME)}<ruby>駅<rt>えき</rt></ruby>から でんしゃに のって いこう。<br>` +
     `まず <ruby>時刻表<rt>じこくひょう</rt></ruby>を <ruby>見<rt>み</rt></ruby>てみよう。`,
-    'わかった！', ()=>showTT(false));
+    'わかった！', ()=>showTT({isRescue:false, fromPlatform:false}));
+}
+
+/* ============ 路線図（リアルモード用） ============ */
+function renderLineMap(){
+  const wrap=$('#linemap-wrap');
+  if(G.mode!=='real'){ wrap.classList.remove('show'); return; }
+  wrap.classList.add('show');
+  let html='<div class="lm-line"></div><div class="lm-row">';
+  for(let i=0;i<STATIONS.length;i++){
+    html+=`<div class="lm-sta ${EXP_STOPS.has(i)?'expstop':''} ${i===G.curSta?'here':''} ${i===G.trip.to?'dest':''}">`+
+      `<div class="dot"></div><div class="nm">${rb(i)}</div></div>`;
+  }
+  html+='</div>';
+  $('#linemap').innerHTML=html;
+  $('#lm-legend').innerHTML=
+    `<span class="lg"><span class="sw hereex"></span>いま いる <ruby>駅<rt>えき</rt></ruby></span>`+
+    `<span class="lg"><span class="sw" style="border-color:var(--blue)"></span>${typeRb('local')}のみ <ruby>停車<rt>ていしゃ</rt></ruby></span>`+
+    `<span class="lg"><span class="sw exp"></span>${typeRb('exp')}も <ruby>停車<rt>ていしゃ</rt></ruby></span>`+
+    `<span class="lg">🎯 もくてきち：${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>（${EXP_STOPS.has(G.trip.to)?typeRb('exp')+'も とまる':typeRb('exp')+'は とおりすぎる'}）</span>`;
 }
 
 /* ============ 時刻表 ============ */
 function needDir(){ return G.trip.to < G.curSta ? 'up' : 'down'; }
 
-function showTT(isRescue){
-  G.state='TIMETABLE'; G.planned=null;
+function showTT(opts){
+  opts=opts||{};
+  G.state='TIMETABLE';
+  // ホームから「時刻表を見る」で開いた場合は、既に確定している乗車予定を保持する
+  // （「もとのホームに戻る」で同じ電車を待ち続けられるようにするため）
+  if(!opts.fromPlatform) G.planned=null;
+  G.fromPlatform = !!opts.fromPlatform;
   const dir=needDir();
   let bn;
-  if(isRescue){
+  if(opts.isRescue==='notyet'){
+    bn = `😊 ${rb(G.curSta)}<ruby>駅<rt>えき</rt></ruby>で おりたけど、まだ ${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>には ついていないよ。<br>`+
+         `つぎの でんしゃに のる ほうほうを かんがえよう。`;
+  } else if(opts.isRescue){
     bn = `😊 だいじょうぶ！ ここは ${rb(G.curSta)}<ruby>駅<rt>えき</rt></ruby>。` +
          `${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>へ <ruby>行<rt>い</rt></ruby>く でんしゃを えらびなおそう。`;
   } else if(G.trip.phase==='back'){
@@ -423,115 +521,154 @@ function showTT(isRescue){
     bn += `<br>▶ のる でんしゃ：<b>${dirRb(dir)}（${rb(DIR_DEST[dir])}ゆき）の ${typeRb('local')}</b>`;
   }
   $('#tt-banner').innerHTML=bn;
+  renderLineMap();
   renderTT();
+  $('#tt-backrow').style.display = G.fromPlatform ? '' : 'none';
   show('s-tt');
   updateHdr();
 }
-$('#tab-weekday').addEventListener('click',()=>{ G.ttTab='weekday'; renderTT(); });
-$('#tab-weekend').addEventListener('click',()=>{ G.ttTab='weekend'; renderTT(); });
+$('#btn-back-platform').addEventListener('click',()=>{
+  if(G.state!=='TIMETABLE') return;
+  showPlatform({keepTrains:true});
+});
 
-function renderTT(){
-  $('#tab-weekday').classList.toggle('act', G.ttTab==='weekday');
-  $('#tab-weekend').classList.toggle('act', G.ttTab==='weekend');
+function ttDirsAvailable(dir){
+  return !((dir==='up'&&G.curSta===0)||(dir==='down'&&G.curSta===6));
+}
+function buildDirGridHTML(day, dir){
+  if(!ttDirsAvailable(dir)) return '';
   const showExp = G.mode==='real';
-  $('#tt-legend').innerHTML =
-    `<span class="lg"><span class="sw"></span>${typeRb('local')}</span>` +
-    (showExp?`<span class="lg"><span class="sw exp"></span>${typeRb('exp')}（とまらない<ruby>駅<rt>えき</rt></ruby>が あるよ）</span>`:'');
-  const dirs = G.mode==='real' ? ['up','down'] : [needDir()];
-  let html='';
-  for(const dir of dirs){
-    // 終点方向には出発できない
-    if((dir==='up'&&G.curSta===0)||(dir==='down'&&G.curSta===6)) continue;
-    html += `<div class="tt-dir"><h3>${dirRb(dir)}　${rb(DIR_DEST[dir])}ゆき</h3><div class="tt-grid">`;
-    for(const h of HOURS){
-      const cells=[];
-      for(const type of (showExp?['local','exp']:['local'])){
-        // 急行が停まらない駅では急行は選べない
-        if(type==='exp' && !EXP_STOPS.has(G.curSta)) continue;
-        for(const m of PAT[G.ttTab][dir][type]) cells.push({m,type});
-      }
-      cells.sort((a,b)=>a.m-b.m);
-      if(!cells.length) continue;
-      html += `<div class="tt-row"><div class="tt-hour">${h}</div><div class="tt-mins">`;
-      for(const c of cells){
-        const t=h*60+c.m;
-        const past = t < G.clock+1;
-        html += `<button class="tt-cell ${c.type==='exp'?'exp':''} ${past?'past':''}" `+
-          `data-time="${t}" data-dir="${dir}" data-type="${c.type}">`+
-          `${String(c.m).padStart(2,'0')}${c.type==='exp'?'<span class="k">急</span>':''}</button>`;
-      }
-      html += `</div></div>`;
+  let html = `<div class="tt-dir ${dir}"><h3>${dirRb(dir)}　${rb(DIR_DEST[dir])}ゆき</h3><div class="tt-grid">`;
+  for(const h of HOURS){
+    const cells=[];
+    for(const type of (showExp?['local','exp']:['local'])){
+      for(const m of (PAT[day][dir][type][h]||[])) cells.push({m,type});
+    }
+    cells.sort((a,b)=>a.m-b.m);
+    if(!cells.length) continue;
+    html += `<div class="tt-row"><div class="tt-hour">${h}</div><div class="tt-mins">`;
+    for(const c of cells){
+      const t=h*60+c.m;
+      const past = t < G.clock+1;
+      html += `<button class="tt-cell ${c.type==='exp'?'exp':''} ${past?'past':''}" `+
+        `data-day="${day}" data-time="${t}" data-dir="${dir}" data-type="${c.type}">`+
+        `${String(c.m).padStart(2,'0')}${c.type==='exp'?'<span class="k">急</span>':''}</button>`;
     }
     html += `</div></div>`;
   }
-  $('#tt-body').innerHTML=html;
+  html += `</div></div>`;
+  return html;
+}
+
+function renderTT(){
+  const showExp = G.mode==='real';
+  $('#tt-legend').innerHTML =
+    `<span class="lg"><span class="sw"></span>${typeRb('local')}</span>` +
+    (showExp?`<span class="lg"><span class="sw exp"></span>${typeRb('exp')}（とまらない<ruby>駅<rt>えき</rt></ruby>が あるよ）</span>`:'') +
+    `<span class="lg note">${fmt(DAY_START)}〜${fmt(DAY_END)}の <ruby>時刻表<rt>じこくひょう</rt></ruby></span>`;
+
+  if(G.mode==='real'){
+    // 平日・土日を最初から並べて表示（タブなし）
+    $('#tt-tabs').style.display='none';
+    const dirs=['up','down'];
+    let html='<div class="tt-dual">';
+    for(const day of ['weekday','weekend']){
+      html+=`<div class="tt-daycol"><h4>${day==='weekday'?'📅 平日':'🌞 土日'}</h4>`;
+      for(const dir of dirs) html+=buildDirGridHTML(day, dir);
+      html+='</div>';
+    }
+    html+='</div>';
+    $('#tt-body').innerHTML=html;
+  } else {
+    $('#tt-tabs').style.display='';
+    // ふつうモードはプレイヤーが選んだ曜日の時刻表のみ、方向は固定表示
+    const dir=needDir();
+    $('#tt-tabs').innerHTML = `<button id="tab-info" style="flex:1;background:var(--blue);color:#fff;box-shadow:none;" disabled>`+
+      `${G.dayType==='weekday'?'📅 平日':'🌞 土日'}の <ruby>時刻表<rt>じこくひょう</rt></ruby></button>`;
+    $('#tt-body').innerHTML = buildDirGridHTML(G.dayType, dir);
+  }
   for(const el of document.querySelectorAll('.tt-cell')) el.addEventListener('click',()=>pickCell(el));
 }
 
 function pickCell(el){
-  const t=+el.dataset.time, dir=el.dataset.dir, type=el.dataset.type;
+  const t=+el.dataset.time, dir=el.dataset.dir, type=el.dataset.type, day=el.dataset.day;
   if(t < G.clock+1){
     sndSoft();
     modal('past','⏰',`その でんしゃは もう <ruby>行<rt>い</rt></ruby>ってしまいました。<br>いまの <ruby>時刻<rt>じこく</rt></ruby>（<b>${fmt(G.clock)}</b>）より あとの <ruby>時刻<rt>じこく</rt></ruby>を えらぼう。`,'わかった');
     return;
   }
+  // その曜日欄で、今より前にあり・かつこの電車より早く来る「乗れる電車」があるか確認
+  let earlierNote='';
+  if(day===G.dayType){
+    const earlier=fullSchedule(G.dayType).filter(x=>x.dir===dir && x.time>=G.clock+1 && x.time<t &&
+      !(x.type==='exp' && !EXP_STOPS.has(G.curSta)));
+    if(earlier.length){
+      earlierNote = `<br><span style="color:#a3591a">💡 それより <ruby>早<rt>はや</rt></ruby>く <b>${fmt(earlier[0].time)}</b> の でんしゃも あるよ。</span>`;
+    }
+  }
   modal('confirm','🚃',
-    `<b>${fmt(t)}</b> の ${dirRb(dir)} ${typeRb(type)}<br>（${rb(DIR_DEST[dir])}ゆき）に のりますか？`,
+    `<b>${fmt(t)}</b> の ${dirRb(dir)} ${typeRb(type)}<br>（${rb(DIR_DEST[dir])}ゆき）に のりますか？${earlierNote}`,
     'のる！', ()=>{
-      const exists = fullSchedule(G.dayType).some(x=>x.time===t&&x.dir===dir&&x.type===type);
+      const exists = day===G.dayType && fullSchedule(G.dayType).some(x=>x.time===t&&x.dir===dir&&x.type===type);
       G.planned={time:t, dir, type, exists, handled:false};
-      showPlatform();
+      showPlatform({keepTrains:false});
     }, 'やめる');
 }
 
-/* テスト補助：条件に合う未来の便を選んで確定 */
-window.__pickTrain = function(dir,type){
+/* テスト補助：条件に合う未来の便を選んで確定（dayを省略時は現在の曜日） */
+window.__pickTrain = function(dir,type,day){
+  day = day || G.dayType;
   const cells=[...document.querySelectorAll('.tt-cell')]
-    .filter(c=>c.dataset.dir===dir&&c.dataset.type===type&&(+c.dataset.time)>=G.clock+1)
+    .filter(c=>c.dataset.dir===dir&&c.dataset.type===type&&c.dataset.day===day&&(+c.dataset.time)>=G.clock+1)
     .sort((a,b)=>a.dataset.time-b.dataset.time);
   if(!cells.length) return false;
   cells[0].click(); $('#modal-ok').click(); return true;
 };
 
-/* ============ ホーム ============ */
-function showPlatform(){
+/* ============ ホーム（上り/下り 二線） ============ */
+function showPlatform(opts){
+  opts=opts||{};
   G.state='PLATFORM';
-  G.platform={train:null, timer:0};
+  if(!opts.keepTrains){
+    G.platform={up:null, down:null, upTimer:0, downTimer:0};
+  }
   const p=G.planned;
   $('#plat-banner').innerHTML =
     `のる でんしゃ：<b>${fmt(p.time)}</b> ${dirRb(p.dir)} ${typeRb(p.type)}（${rb(DIR_DEST[p.dir])}ゆき）<br>` +
     `ホームで <ruby>待<rt>ま</rt></ruby>ちましょう。でんしゃが <ruby>来<rt>き</rt></ruby>たら「のる」を タップ！`;
   $('#plat-mark').innerHTML=`${rb(G.curSta)}<ruby>駅<rt>えき</rt></ruby>`;
-  $('#train').style.left='110%';
-  $('#train-label').textContent='';
+  $('#up-dest-label').innerHTML = ttDirsAvailable('up') ? `（${rb(DIR_DEST.up)}ゆき）` : '（この駅始発ではありません）';
+  $('#down-dest-label').innerHTML = ttDirsAvailable('down') ? `（${rb(DIR_DEST.down)}ゆき）` : '（この駅始発ではありません）';
+  $('#track-up').style.display = ttDirsAvailable('up')?'':'none';
+  $('#track-down').style.display = ttDirsAvailable('down')?'':'none';
+  $('#track-up').classList.add('dir-up'); $('#track-down').classList.add('dir-down');
+  if(!opts.keepTrains){
+    for(const d of ['up','down']){
+      $('#train-'+d).style.left = d==='up' ? '-60%' : '110%';
+      $('#train-'+d+'-label').textContent='';
+    }
+  }
   $('#btn-board').disabled=true;
+  G.platform.boardable=null;
   show('s-platform');
   updateHdr();
 }
-$('#btn-open-tt').addEventListener('click',()=>showTT(false));
-$('#btn-ff').addEventListener('click',()=>{
-  if(G.platform.train) return;
-  const nx=nextPlatformEvent();
-  if(nx) G.clock=Math.max(G.clock, nx.time-0.6);
-});
+$('#btn-open-tt').addEventListener('click',()=>showTT({isRescue:false, fromPlatform:true}));
 $('#btn-board').addEventListener('click',()=>{
-  const tr=G.platform.train;
+  const tr=G.platform.boardable;
   if(!tr||tr.passing) return;
   sndDoor();
   startRide(tr);
 });
 
-function platformEvents(){
-  let all=fullSchedule(G.dayType);
-  if(G.mode==='normal'){
-    const dir=needDir();
-    all=all.filter(t=>t.type==='local'&&t.dir===dir);
-  }
-  all=all.filter(t=>!(t.dir==='up'&&G.curSta===0)&&!(t.dir==='down'&&G.curSta===6));
+function platformEventsForDir(dir){
+  let all=fullSchedule(G.dayType).filter(t=>t.dir===dir);
+  if(G.mode==='normal') all=all.filter(t=>t.type==='local');
+  if(!ttDirsAvailable(dir)) return [];
   return all.map(t=>({...t, passing: t.type==='exp'&&!EXP_STOPS.has(G.curSta)}));
 }
-function nextPlatformEvent(){
-  return platformEvents().find(t=>t.time>=G.clock) || null;
+function nextEventFor(dir){
+  return platformEventsForDir(dir).find(t=>t.time>=G.clock) || null;
 }
 function matchesPlanned(t){
   const p=G.planned;
@@ -539,20 +676,43 @@ function matchesPlanned(t){
 }
 
 function tickPlatform(dt){
+  // 大きなdt（画面遷移などで実時間が経過した場合）は小刻みに分割して処理する
+  const STEP=250;
+  while(dt>0){
+    const step=Math.min(dt, STEP);
+    tickPlatformStep(step);
+    dt-=step;
+    if(G.modalOpen) return; // モーダルが開いたら以降の分割処理は中断
+  }
+}
+function tickPlatformStep(dt){
   const pf=G.platform;
-  if(pf.train){
-    pf.timer-=dt;
-    if(pf.timer<=0) departTrain();
-    return;
+  // ピッピッピ演出（待機中、実時間で一定間隔に鳴らす）
+  if(!pf.up && !pf.down){
+    pf._pipAcc=(pf._pipAcc||0)+dt;
+    if(pf._pipAcc>420){ pf._pipAcc=0; sndPip(); }
   }
+  let arrivedSomething=false;
+  for(const dir of ['up','down']){
+    const key=dir; // pf.up / pf.down
+    if(pf[key]){
+      pf[key+'Timer']-=dt;
+      if(pf[key+'Timer']<=0) departTrain(dir);
+      continue;
+    }
+    if(!ttDirsAvailable(dir)) continue;
+    const nx=nextEventFor(dir);
+    if(nx && G.clock >= nx.time-0.3){
+      arriveTrain(dir, nx);
+      arrivedSomething=true;
+    }
+  }
+  if(arrivedSomething) return;
   // 待ち時間の経過（1実秒 = ゲーム内20秒）。次の電車の到着時刻でクランプする
-  const nx=nextPlatformEvent();
+  const cands=['up','down'].filter(ttDirsAvailable).map(nextEventFor).filter(Boolean);
+  const nxTime = cands.length ? Math.min(...cands.map(t=>t.time)) : null;
   G.clock += dt/1000 * (20/60);
-  if(nx && G.clock >= nx.time-0.3){
-    G.clock = nx.time-0.3;
-    arriveTrain(nx);
-    return;
-  }
+  if(nxTime!==null && G.clock >= nxTime-0.3) G.clock = nxTime-0.3;
   // 「選んだ電車が実は存在しない」（平日/土日の欄を読み違えた）
   const p=G.planned;
   if(p && !p.exists && !p.handled && G.clock > p.time+0.5){
@@ -561,29 +721,37 @@ function tickPlatform(dt){
       `あれ？ でんしゃが <ruby>来<rt>き</rt></ruby>ません…<br>` +
       `きょうは <b>${G.dayType==='weekday'?'<ruby>平日<rt>へいじつ</rt></ruby>':'<ruby>土日<rt>どにち</rt></ruby>'}</b>です。<br>` +
       `<ruby>時刻表<rt>じこくひょう</rt></ruby>の <ruby>欄<rt>らん</rt></ruby>を もういちど たしかめよう！`,
-      '時刻表を見る', ()=>showTT(false));
-    return;
+      '時刻表を見る', ()=>showTT({isRescue:false, fromPlatform:true}));
   }
 }
-function arriveTrain(t){
-  G.platform.train=t;
-  G.platform.timer = t.passing ? 2600 : 6500;
-  const tr=$('#train');
+function arriveTrain(dir, t){
+  G.platform[dir]=t;
+  G.platform[dir+'Timer'] = t.passing ? 2600 : 6500;
+  const tr=$('#train-'+dir);
   tr.classList.toggle('exp', t.type==='exp');
-  tr.style.left = t.passing ? '-60%' : '50%';
-  if(!t.passing) tr.style.transform='translateX(-50%)'; else tr.style.transform='';
-  $('#train-label').innerHTML = t.passing
+  const stoppedLeft = dir==='up' ? '50%' : '50%';
+  tr.style.left = t.passing ? (dir==='up'?'-60%':'110%') : stoppedLeft;
+  tr.style.transform = t.passing ? '' : 'translateX(-50%)';
+  $('#train-'+dir+'-label').innerHTML = t.passing
     ? `⚠️ ${typeRb('exp')}が <ruby>通過<rt>つうか</rt></ruby>します（のれません）`
-    : `${fmt(t.time)}　${dirRb(t.dir)} ${typeRb(t.type)}　${rb(DIR_DEST[t.dir])}ゆき`;
-  $('#btn-board').disabled = !!t.passing;
-  if(!t.passing) sndBell(); else sndChime();
+    : `${fmt(t.time)}　${typeRb(t.type)}　${rb(DIR_DEST[dir])}ゆき`;
+  if(!t.passing){
+    G.platform.boardable=t;
+    $('#btn-board').disabled=false;
+    sndBell();
+  } else {
+    sndChime();
+  }
 }
-function departTrain(){
-  const t=G.platform.train;
-  G.platform.train=null;
-  $('#train').style.left='110%'; $('#train').style.transform='';
-  $('#train-label').textContent='';
-  $('#btn-board').disabled=true;
+function departTrain(dir){
+  const t=G.platform[dir];
+  if(!t) return;
+  G.platform[dir]=null;
+  const tr=$('#train-'+dir);
+  tr.style.left = dir==='up' ? '-60%' : '110%';
+  tr.style.transform='';
+  $('#train-'+dir+'-label').textContent='';
+  if(G.platform.boardable===t){ G.platform.boardable=null; $('#btn-board').disabled=true; }
   G.clock=Math.max(G.clock, t.time+0.3);
   if(!t.passing && matchesPlanned(t)){
     // 乗り過ごし
@@ -594,18 +762,20 @@ function departTrain(){
       `あっ、でんしゃが <ruby>行<rt>い</rt></ruby>ってしまった…<br>` +
       `だいじょうぶ、もう<ruby>一度<rt>いちど</rt></ruby> やってみよう！<br>` +
       `<ruby>時刻表<rt>じこくひょう</rt></ruby>で <ruby>次<rt>つぎ</rt></ruby>の でんしゃを えらぼう。`,
-      '時刻表を見る', ()=>showTT(false));
+      '時刻表を見る', ()=>showTT({isRescue:false, fromPlatform:true}));
   }
 }
 
 /* ============ 乗車中 ============ */
 function startRide(tr){
   G.state='RIDE';
-  G.platform.train=null;
+  G.platform[tr.dir]=null;
+  G.platform.boardable=null;
   G.ride={
     dir:tr.dir, type:tr.type, pos:G.curSta, from:G.curSta,
     phase:'depart', t:1400, dirChecked:false,
     flags:{over:false, type:false, dir:false},
+    pipAcc:0,
   };
   $('#ride-banner').innerHTML =
     `${dirRb(tr.dir)} ${typeRb(tr.type)}（${rb(DIR_DEST[tr.dir])}ゆき）に <ruby>乗車中<rt>じょうしゃちゅう</rt></ruby><br>` +
@@ -631,6 +801,11 @@ function setAnnounce(html){ $('#announce').innerHTML=html; }
 
 function tickRide(dt){
   const r=G.ride; if(!r) return;
+  // 移動中はピッピッピで速く進める演出
+  if(r.phase==='moving'){
+    r.pipAcc=(r.pipAcc||0)+dt;
+    if(r.pipAcc>380){ r.pipAcc=0; sndPip(); }
+  }
   r.t-=dt;
   if(r.t>0) return;
   const d = r.dir==='up' ? -1 : 1;
@@ -640,7 +815,7 @@ function tickRide(dt){
       // 目的の駅で降りそこねた
       r.flags.over=true;
     }
-    r.phase='moving'; r.t=3200;
+    r.phase='moving'; r.t=2000;
     const next=r.pos+d;
     const stops = r.type==='local'||EXP_STOPS.has(next);
     sndChime();
@@ -675,26 +850,38 @@ function tickRide(dt){
         }
       }
     } else {
-      r.phase='pass'; r.t=1400;
+      r.phase='pass'; r.t=1000;
       setAnnounce(`💨 ${rb(r.pos)}を <ruby>通過<rt>つうか</rt></ruby>…`);
       $('#btn-alight').disabled=true;
     }
   }
 }
+/* エラー分岐：まず「まだ着いていません」を表示 → ボタン操作 → 「次の電車に乗れます」の2段階 */
 function forcedAlightModal(){
   const r=G.ride; sndSoft();
-  let msg;
+  let msg1, counterFn;
   if(r.flags.dir){
-    G.counters.dir++; r.flags.dir=false; r.flags.over=false; r.flags.type=false;
-    msg=`あれれ、<ruby>反対<rt>はんたい</rt></ruby><ruby>方向<rt>ほうこう</rt></ruby>の でんしゃ だったみたい…<br>だいじょうぶ、ここで おりて もどろう！`;
+    counterFn=()=>{G.counters.dir++;};
+    msg1=`あれれ、<ruby>反対<rt>はんたい</rt></ruby><ruby>方向<rt>ほうこう</rt></ruby>の でんしゃ だったみたい…<br>` +
+         `${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>には まだ ついていないよ。`;
   } else if(r.flags.type){
-    G.counters.type++; r.flags.type=false; r.flags.over=false;
-    msg=`${typeRb('exp')}は ${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>に とまりません でした…<br>だいじょうぶ、ここで おりて もどろう！`;
+    counterFn=()=>{G.counters.type++;};
+    msg1=`${typeRb('exp')}は ${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>に とまりません でした…<br>` +
+         `${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>には まだ ついていないよ。`;
   } else {
-    G.counters.over++; r.flags.over=false;
-    msg=`${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>を <ruby>過<rt>す</rt></ruby>ぎてしまった…<br>だいじょうぶ、ここで おりて もどろう！`;
+    counterFn=()=>{G.counters.over++;};
+    msg1=`${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>を <ruby>過<rt>す</rt></ruby>ぎてしまった…<br>` +
+         `${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>には まだ ついていないよ。`;
   }
-  modal('forced','😊',msg,'ここで おりる',()=>alightAt(G.ride.pos));
+  r.flags.dir=false; r.flags.type=false; r.flags.over=false;
+  modal('notYet','😊', msg1, 'つぎは どうする？', ()=>{
+    counterFn();
+    sndSoft();
+    modal('canBoard','🚃',
+      `だいじょうぶ！ ${rb(G.ride.pos)}<ruby>駅<rt>えき</rt></ruby>で おりて、<br>`+
+      `つぎの でんしゃに のれば ${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>まで いけるよ。`,
+      'ここで おりる', ()=>alightAt(G.ride.pos));
+  });
 }
 $('#btn-alight').addEventListener('click',()=>{
   const r=G.ride;
@@ -709,7 +896,7 @@ function alightAt(s){
     if(G.trip.phase==='out') showErrand();
     else showResult();
   } else {
-    showTT(true);   // 救済フロー：同じ時刻表UIを再利用
+    showTT({isRescue:true, fromPlatform:false});   // 救済フロー：同じ時刻表UIを再利用
   }
 }
 
@@ -750,7 +937,7 @@ function tickErrand(dt){
 $('#btn-errand-done').addEventListener('click',startReturn);
 function startReturn(){
   G.trip={phase:'back', to:HOME};
-  showTT(false);
+  showTT({isRescue:false, fromPlatform:false});
 }
 
 /* ============ リザルト ============ */
