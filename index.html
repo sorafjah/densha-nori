@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>でんしゃにのろう</title>
+<style>
+  :root{
+    --blue:#1a6fb5; --blue-d:#0d4f85; --red:#d34040; --green:#2e8b57;
+    --bg:#eef4fa; --card:#ffffff; --ink:#22303c; --dim:#8b98a5;
+    --yellow:#f5c542;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    font-family:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    background:var(--bg); color:var(--ink);
+    touch-action:manipulation; user-select:none; -webkit-user-select:none;
+    overscroll-behavior:none;
+  }
+  ruby rt{font-size:0.45em; color:inherit; opacity:.85;}
+  #app{max-width:760px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;}
+
+  /* header */
+  #hdr{
+    background:var(--blue-d); color:#fff; padding:8px 12px;
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    position:sticky; top:0; z-index:5;
+  }
+  #hdr .clock{font-size:1.5rem; font-weight:bold; letter-spacing:1px; font-variant-numeric:tabular-nums;}
+  #hdr .date{font-size:.95rem;}
+  #hdr .where{font-size:.95rem; text-align:right;}
+
+  .screen{display:none; flex:1; padding:14px; flex-direction:column; gap:12px;}
+  .screen.on{display:flex;}
+
+  .card{background:var(--card); border-radius:14px; padding:14px; box-shadow:0 2px 6px rgba(20,40,70,.08);}
+  h1{font-size:1.5rem; margin:.2em 0; text-align:center;}
+  h2{font-size:1.15rem; margin:.2em 0;}
+  .center{text-align:center;}
+  .note{color:var(--dim); font-size:.9rem;}
+
+  button{
+    font-family:inherit; font-size:1.05rem; border:none; border-radius:12px;
+    min-height:48px; min-width:48px; padding:10px 18px; cursor:pointer;
+    background:var(--blue); color:#fff; font-weight:bold;
+    box-shadow:0 3px 0 rgba(0,0,0,.18);
+  }
+  button:active{transform:translateY(2px); box-shadow:0 1px 0 rgba(0,0,0,.18);}
+  button:disabled{background:#b9c4ce; box-shadow:none; color:#eef;}
+  button.big{font-size:1.3rem; padding:16px 24px; width:100%;}
+  button.ghost{background:#e7eef5; color:var(--blue-d);}
+  button.green{background:var(--green);}
+  button.warn{background:var(--red);}
+
+  /* banner */
+  .banner{
+    background:#fff8e0; border:2px solid var(--yellow); border-radius:12px;
+    padding:10px 12px; font-size:1.05rem;
+  }
+  .banner.info{background:#e8f2fc; border-color:var(--blue);}
+
+  /* timetable */
+  .tt-tabs{display:flex; gap:8px;}
+  .tt-tabs button{flex:1; background:#dfe8f0; color:var(--ink); box-shadow:none;}
+  .tt-tabs button.act{background:var(--blue); color:#fff;}
+  .tt-dir{margin-top:10px;}
+  .tt-dir h3{
+    margin:0; background:var(--blue-d); color:#fff; padding:8px 10px;
+    border-radius:10px 10px 0 0; font-size:1.05rem;
+  }
+  .tt-grid{border:2px solid var(--blue-d); border-top:none; border-radius:0 0 10px 10px; overflow:hidden; background:#fff;}
+  .tt-row{display:flex; border-bottom:1px solid #dde5ec;}
+  .tt-row:last-child{border-bottom:none;}
+  .tt-hour{
+    width:52px; flex:0 0 52px; background:#f0f5fa; display:flex; align-items:center; justify-content:center;
+    font-weight:bold; font-size:1.1rem; border-right:2px solid #cdd8e2; font-variant-numeric:tabular-nums;
+  }
+  .tt-mins{display:flex; flex-wrap:wrap; gap:6px; padding:6px 8px; flex:1;}
+  .tt-cell{
+    min-width:48px; min-height:44px; padding:4px 8px; border-radius:8px;
+    background:#f2f6fa; color:var(--ink); font-weight:bold; font-size:1.05rem;
+    box-shadow:inset 0 0 0 1px #ccd7e1; font-variant-numeric:tabular-nums;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.1;
+  }
+  .tt-cell .k{font-size:.6rem; font-weight:normal;}
+  .tt-cell.exp{background:#fdecec; color:var(--red); box-shadow:inset 0 0 0 2px var(--red);}
+  .tt-cell.past{opacity:.35;}
+  .tt-legend{display:flex; gap:14px; padding:8px 4px; font-size:.9rem; align-items:center; flex-wrap:wrap;}
+  .lg{display:inline-flex; align-items:center; gap:5px;}
+  .lg .sw{width:20px;height:20px;border-radius:5px; background:#f2f6fa; box-shadow:inset 0 0 0 1px #ccd7e1;}
+  .lg .sw.exp{background:#fdecec; box-shadow:inset 0 0 0 2px var(--red);}
+
+  /* platform */
+  #plat-scene{
+    position:relative; height:190px; border-radius:12px; overflow:hidden;
+    background:linear-gradient(#bfe0f7 0 55%, #9aa7b1 55% 70%, #e8e2d5 70% 100%);
+  }
+  #plat-line{position:absolute; left:0; right:0; top:64%; height:5px; background:#555;}
+  #train{
+    position:absolute; top:34%; left:110%; width:300px; height:64px; transition:left 1.1s ease-out;
+    display:flex; align-items:stretch; gap:3px;
+  }
+  #train .carbody{flex:1; background:#3d87c9; border-radius:10px; position:relative; border-bottom:8px solid #2a5d8c;}
+  #train.exp .carbody{background:#d34040; border-bottom-color:#8c2a2a;}
+  #train .carbody::before{content:""; position:absolute; left:8%; right:8%; top:18%; height:38%; background:#dff0fb; border-radius:5px;}
+  #train-label{
+    position:absolute; top:8%; left:0; right:0; text-align:center; font-weight:bold; font-size:1.05rem;
+    color:#123; text-shadow:0 1px 0 #fff;
+  }
+  #plat-mark{position:absolute; bottom:8%; left:50%; transform:translateX(-50%); font-size:.9rem; background:#fff; border-radius:8px; padding:3px 10px;}
+  .btnrow{display:flex; gap:10px; flex-wrap:wrap;}
+  .btnrow button{flex:1;}
+
+  /* ride */
+  #route{display:flex; align-items:center; justify-content:space-between; padding:26px 6px 6px; position:relative;}
+  #route .rline{position:absolute; left:4%; right:4%; top:36px; height:6px; background:var(--blue); border-radius:3px;}
+  .sta{position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:4px; width:13%;}
+  .sta .dot{width:18px; height:18px; border-radius:50%; background:#fff; border:4px solid var(--blue);}
+  .sta.expstop .dot{border-color:var(--red);}
+  .sta .nm{font-size:.62rem; text-align:center; line-height:1.15; word-break:keep-all;}
+  .sta.target .dot{background:var(--yellow);}
+  .sta.here .dot{box-shadow:0 0 0 5px rgba(245,197,66,.55);}
+  #ride-train{position:absolute; top:-2px; font-size:1.7rem; transition:left .9s ease; z-index:2;}
+  #announce{
+    min-height:74px; background:#12233a; color:#ffe9a8; border-radius:12px;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    font-size:1.25rem; padding:10px; line-height:1.5;
+  }
+
+  /* errand */
+  #errand-art{font-size:4rem; text-align:center; padding:14px 0;}
+  .progress{height:14px; background:#e2eaf1; border-radius:7px; overflow:hidden;}
+  .progress i{display:block; height:100%; width:0%; background:var(--green); transition:width .3s linear;}
+
+  /* result */
+  .rtable{width:100%; border-collapse:collapse; font-size:1.05rem;}
+  .rtable td{padding:8px 6px; border-bottom:1px solid #e2eaf1;}
+  .rtable td:last-child{text-align:right; font-weight:bold; font-variant-numeric:tabular-nums;}
+  #title-badge{
+    text-align:center; font-size:1.5rem; font-weight:bold; color:var(--blue-d);
+    background:#fff6d8; border:3px solid var(--yellow); border-radius:14px; padding:14px;
+  }
+
+  /* modal */
+  #modal-bg{
+    position:fixed; inset:0; background:rgba(10,25,45,.55); display:none;
+    align-items:center; justify-content:center; z-index:50; padding:18px;
+  }
+  #modal-bg.on{display:flex;}
+  #modal{
+    background:#fff; border-radius:16px; padding:20px; max-width:440px; width:100%;
+    display:flex; flex-direction:column; gap:14px; text-align:center;
+  }
+  #modal-text{font-size:1.15rem; line-height:1.7;}
+  #modal-icon{font-size:2.6rem;}
+  .modebtns{display:flex; flex-direction:column; gap:12px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hdr">
+    <div class="clock" id="hdr-clock">--:--</div>
+    <div class="date" id="hdr-date"></div>
+    <div class="where" id="hdr-where"></div>
+  </div>
+
+  <!-- モード選択 -->
+  <div class="screen on" id="s-mode">
+    <h1>🚃 でんしゃにのろう</h1>
+    <p class="center note">ひとりで でんしゃに のる れんしゅうを しよう</p>
+    <div class="card modebtns">
+      <button class="big" id="btn-mode-normal">ふつうモード<br><span style="font-size:.85rem;font-weight:normal">かくえきていしゃ だけ。ゆっくり れんしゅう</span></button>
+      <button class="big warn" id="btn-mode-real">リアルモード<br><span style="font-size:.85rem;font-weight:normal"><ruby>急行<rt>きゅうこう</rt></ruby>や <ruby>方向<rt>ほうこう</rt></ruby>も じぶんで えらぶ</span></button>
+    </div>
+  </div>
+
+  <!-- 平日/土日選択（ふつうモード） -->
+  <div class="screen" id="s-day">
+    <h2 class="center">きょうは どっち？</h2>
+    <div class="card modebtns">
+      <button class="big" id="btn-day-weekday"><ruby>平日<rt>へいじつ</rt></ruby>（<ruby>月<rt>げつ</rt></ruby>〜<ruby>金<rt>きん</rt></ruby>）</button>
+      <button class="big green" id="btn-day-weekend"><ruby>土日<rt>どにち</rt></ruby>（<ruby>土<rt>ど</rt></ruby>・<ruby>日<rt>にち</rt></ruby>）</button>
+    </div>
+  </div>
+
+  <!-- 時刻表 -->
+  <div class="screen" id="s-tt">
+    <div class="banner" id="tt-banner"></div>
+    <div class="card">
+      <div class="tt-tabs">
+        <button id="tab-weekday">📅 <ruby>平日<rt>へいじつ</rt></ruby></button>
+        <button id="tab-weekend">🌞 <ruby>土日<rt>どにち</rt></ruby></button>
+      </div>
+      <div class="tt-legend" id="tt-legend"></div>
+      <div id="tt-body"></div>
+    </div>
+    <p class="note center">のりたい <ruby>時刻<rt>じこく</rt></ruby>を タップしてね</p>
+  </div>
+
+  <!-- ホーム -->
+  <div class="screen" id="s-platform">
+    <div class="banner info" id="plat-banner"></div>
+    <div id="plat-scene">
+      <div id="plat-line"></div>
+      <div id="train"><div class="carbody"></div><div class="carbody"></div><div class="carbody"></div></div>
+      <div id="train-label"></div>
+      <div id="plat-mark"></div>
+    </div>
+    <div class="btnrow">
+      <button class="big green" id="btn-board" disabled>🚪 のる</button>
+    </div>
+    <div class="btnrow">
+      <button class="ghost" id="btn-ff">⏩ <ruby>早送<rt>はやおく</rt></ruby>り</button>
+      <button class="ghost" id="btn-open-tt">📋 <ruby>時刻表<rt>じこくひょう</rt></ruby>を<ruby>見<rt>み</rt></ruby>る</button>
+    </div>
+  </div>
+
+  <!-- 乗車中 -->
+  <div class="screen" id="s-ride">
+    <div class="banner info" id="ride-banner"></div>
+    <div class="card">
+      <div id="route"></div>
+    </div>
+    <div id="announce"></div>
+    <div class="btnrow">
+      <button class="big warn" id="btn-alight" disabled>🚪 おりる</button>
+    </div>
+  </div>
+
+  <!-- 用事 -->
+  <div class="screen" id="s-errand">
+    <div class="banner" id="errand-banner"></div>
+    <div class="card">
+      <div id="errand-art">🛍️</div>
+      <div class="progress"><i id="errand-bar"></i></div>
+      <p class="center note" id="errand-note">ようじを すませています…</p>
+    </div>
+    <div class="btnrow">
+      <button class="big" id="btn-errand-done" style="display:none">✅ ようじ おわり！<ruby>駅<rt>えき</rt></ruby>へ もどる</button>
+    </div>
+  </div>
+
+  <!-- リザルト -->
+  <div class="screen" id="s-result">
+    <h1>🏠 おうちに つきました！</h1>
+    <div id="title-badge"></div>
+    <div class="card">
+      <table class="rtable" id="result-table"></table>
+    </div>
+    <button class="big" id="btn-again">🔁 もういちど あそぶ</button>
+  </div>
+</div>
+
+<!-- モーダル -->
+<div id="modal-bg">
+  <div id="modal">
+    <div id="modal-icon"></div>
+    <div id="modal-text"></div>
+    <button class="big" id="modal-ok">OK</button>
+    <button class="ghost" id="modal-no" style="display:none">やめる</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============ 基本ユーティリティ ============ */
+const P = new URLSearchParams(location.search);
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+const SEED = parseInt(P.get('seed')||String(Date.now()%1e9),10);
+const rng = mulberry32(SEED);
+let TS = Math.max(0.1, parseFloat(P.get('ts')||'1'));   // テスト用倍速
+window.__setSpeed = v => { TS = v; };
+
+const $ = s => document.querySelector(s);
+function fmt(min){min=Math.floor(min);const h=Math.floor(min/60),m=min%60;return h+':'+String(m).padStart(2,'0');}
+
+/* ============ 路線データ ============ */
+const STATIONS = [
+  {n:'港中央', k:'みなとちゅうおう'},
+  {n:'花見川', k:'はなみがわ'},
+  {n:'青葉台', k:'あおばだい'},
+  {n:'桜が丘', k:'さくらがおか'},   // 自宅の最寄り駅
+  {n:'富士見町', k:'ふじみちょう'},
+  {n:'緑山', k:'みどりやま'},
+  {n:'高原口', k:'こうげんぐち'},
+];
+const HOME = 3;
+const EXP_STOPS = new Set([0,2,3,5,6]);          // 急行停車駅（1,4は通過）
+const DIR_NAME = {up:'上り', up_k:'のぼり', down:'下り', down_k:'くだり'};
+const DIR_DEST = {up:0, down:6};                 // 行き先の終点
+function rb(i){const s=STATIONS[i];return `<ruby>${s.n}<rt>${s.k}</rt></ruby>`;}
+function dirRb(dir){return `<ruby>${DIR_NAME[dir]}<rt>${DIR_NAME[dir+'_k']}</rt></ruby>`;}
+function typeRb(t){return t==='exp' ? '<ruby>急行<rt>きゅうこう</rt></ruby>' : '<ruby>各停<rt>かくてい</rt></ruby>';}
+
+/* 時刻表パターン（毎時の分） */
+const PAT = {
+  weekday:{ up:{local:[4,19,34,49], exp:[12,42]}, down:{local:[9,24,39,54], exp:[27,57]} },
+  weekend:{ up:{local:[8,38],       exp:[28]},    down:{local:[18,48],      exp:[58]} },
+};
+const HOURS = []; for(let h=6;h<=22;h++) HOURS.push(h);
+function fullSchedule(day){
+  const out=[];
+  for(const h of HOURS) for(const dir of ['up','down']) for(const type of ['local','exp'])
+    for(const m of PAT[day][dir][type]) out.push({time:h*60+m, dir, type});
+  out.sort((a,b)=>a.time-b.time);
+  return out;
+}
+
+/* ============ ゲーム状態 ============ */
+const G = {
+  state:'MODE', mode:null, dayType:null, clock:0, startClock:0,
+  curSta:HOME, dest:null,
+  trip:null,                 // {phase:'out'|'back', to}
+  planned:null,              // {time,dir,type,exists}
+  ttTab:'weekday',
+  platform:{train:null, timer:0},
+  ride:null,
+  errand:{timer:0, done:false},
+  counters:{miss:0, over:0, type:0, dir:0},
+  modalOpen:false,
+};
+window.__G = G;
+
+/* URLパラメータでの上書き（テスト用） */
+function initRandom(){
+  const cands=[0,1,2,4,5,6];
+  G.dest = P.has('dest') ? parseInt(P.get('dest'),10) : cands[Math.floor(rng()*cands.length)];
+  G.clock = P.has('start') ? parseInt(P.get('start'),10) : 8*60+30 + Math.floor(rng()*300); // 8:30〜13:30
+  G.startClock = G.clock;
+}
+function forcedDay(){ return P.get('day'); }
+
+/* ============ 音（Web Audio） ============ */
+let AC=null;
+function ac(){ if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC; }
+function tone(f,dur,type='sine',vol=.15,when=0){
+  const c=ac(); if(!c) return;
+  try{
+    const o=c.createOscillator(),g=c.createGain();
+    o.type=type;o.frequency.value=f;
+    g.gain.setValueAtTime(vol,c.currentTime+when);
+    g.gain.exponentialRampToValueAtTime(.001,c.currentTime+when+dur);
+    o.connect(g);g.connect(c.destination);
+    o.start(c.currentTime+when);o.stop(c.currentTime+when+dur+.05);
+  }catch(e){}
+}
+const sndBell = ()=>{for(let i=0;i<6;i++)tone(880,0.12,'square',.08,i*0.15);};      // 発車ベル
+const sndDoor = ()=>{tone(660,0.15,'sine',.12);tone(880,0.2,'sine',.1,0.15);};       // 乗降音
+const sndChime= ()=>{tone(784,0.25,'sine',.12);tone(988,0.3,'sine',.12,0.22);};      // アナウンスチャイム
+const sndSoft = ()=>{tone(440,0.3,'sine',.1);tone(392,0.4,'sine',.1,0.25);};          // 優しい通知
+const sndGood = ()=>{tone(523,0.15,'sine',.12);tone(659,0.15,'sine',.12,0.15);tone(784,0.3,'sine',.12,0.3);};
+
+/* ============ 画面切替 ============ */
+const SCREENS=['s-mode','s-day','s-tt','s-platform','s-ride','s-errand','s-result'];
+function show(id){ for(const s of SCREENS) $('#'+s).classList.toggle('on', s===id); }
+
+function updateHdr(){
+  $('#hdr-clock').textContent = fmt(G.clock);
+  if(G.dayType){
+    const d = G.dayType==='weekday' ? '7月10日（金）' : '7月11日（土）';
+    $('#hdr-date').innerHTML = `<ruby>7月<rt>がつ</rt></ruby>${G.dayType==='weekday'?'10':'11'}<ruby>日<rt>にち</rt></ruby>（${G.dayType==='weekday'?'<ruby>金<rt>きん</rt></ruby>':'<ruby>土<rt>ど</rt></ruby>'}）`;
+  } else $('#hdr-date').textContent='';
+  $('#hdr-where').innerHTML = G.state==='MODE'||G.state==='DAY' ? '' :
+    `いま：${rb(G.curSta)}<ruby>駅<rt>えき</rt></ruby>`;
+}
+
+/* ============ モーダル ============ */
+let modalCb=null, modalNoCb=null;
+function modal(kind, icon, html, okText, cb, noText, noCb){
+  G.modalOpen=true;
+  $('#modal-bg').dataset.kind=kind;
+  $('#modal-icon').textContent=icon;
+  $('#modal-text').innerHTML=html;
+  $('#modal-ok').innerHTML=okText||'OK';
+  modalCb=cb||null;
+  if(noText){ $('#modal-no').style.display=''; $('#modal-no').innerHTML=noText; modalNoCb=noCb||null; }
+  else { $('#modal-no').style.display='none'; modalNoCb=null; }
+  $('#modal-bg').classList.add('on');
+}
+function closeModal(){ G.modalOpen=false; $('#modal-bg').classList.remove('on'); $('#modal-bg').dataset.kind=''; }
+$('#modal-ok').addEventListener('click',()=>{ const cb=modalCb; closeModal(); if(cb)cb(); });
+$('#modal-no').addEventListener('click',()=>{ const cb=modalNoCb; closeModal(); if(cb)cb(); });
+
+/* ============ フロー：開始 ============ */
+$('#btn-mode-normal').addEventListener('click',()=>{ ac(); G.mode='normal'; G.state='DAY'; show('s-day'); });
+$('#btn-mode-real').addEventListener('click',()=>{
+  ac(); G.mode='real';
+  G.dayType = forcedDay() || (rng()<0.5?'weekday':'weekend');
+  startGame();
+});
+$('#btn-day-weekday').addEventListener('click',()=>{ G.dayType='weekday'; startGame(); });
+$('#btn-day-weekend').addEventListener('click',()=>{ G.dayType='weekend'; startGame(); });
+
+function startGame(){
+  initRandom();
+  G.trip={phase:'out', to:G.dest};
+  G.ttTab = G.mode==='normal' ? G.dayType : 'weekday';
+  modal('start','🎒',
+    `きょうは ${rb(G.dest)}<ruby>駅<rt>えき</rt></ruby>の <ruby>近<rt>ちか</rt></ruby>くに おでかけ！<br>` +
+    `${rb(HOME)}<ruby>駅<rt>えき</rt></ruby>から でんしゃに のって いこう。<br>` +
+    `まず <ruby>時刻表<rt>じこくひょう</rt></ruby>を <ruby>見<rt>み</rt></ruby>てみよう。`,
+    'わかった！', ()=>showTT(false));
+}
+
+/* ============ 時刻表 ============ */
+function needDir(){ return G.trip.to < G.curSta ? 'up' : 'down'; }
+
+function showTT(isRescue){
+  G.state='TIMETABLE'; G.planned=null;
+  const dir=needDir();
+  let bn;
+  if(isRescue){
+    bn = `😊 だいじょうぶ！ ここは ${rb(G.curSta)}<ruby>駅<rt>えき</rt></ruby>。` +
+         `${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>へ <ruby>行<rt>い</rt></ruby>く でんしゃを えらびなおそう。`;
+  } else if(G.trip.phase==='back'){
+    bn = `🏠 ${rb(HOME)}<ruby>駅<rt>えき</rt></ruby>へ <ruby>帰<rt>かえ</rt></ruby>ります。` +
+         `<ruby>帰<rt>かえ</rt></ruby>りの でんしゃを えらぼう。`;
+  } else {
+    bn = `🎯 もくてきち：${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>`;
+  }
+  if(G.mode==='normal'){
+    bn += `<br>▶ のる でんしゃ：<b>${dirRb(dir)}（${rb(DIR_DEST[dir])}ゆき）の ${typeRb('local')}</b>`;
+  }
+  $('#tt-banner').innerHTML=bn;
+  renderTT();
+  show('s-tt');
+  updateHdr();
+}
+$('#tab-weekday').addEventListener('click',()=>{ G.ttTab='weekday'; renderTT(); });
+$('#tab-weekend').addEventListener('click',()=>{ G.ttTab='weekend'; renderTT(); });
+
+function renderTT(){
+  $('#tab-weekday').classList.toggle('act', G.ttTab==='weekday');
+  $('#tab-weekend').classList.toggle('act', G.ttTab==='weekend');
+  const showExp = G.mode==='real';
+  $('#tt-legend').innerHTML =
+    `<span class="lg"><span class="sw"></span>${typeRb('local')}</span>` +
+    (showExp?`<span class="lg"><span class="sw exp"></span>${typeRb('exp')}（とまらない<ruby>駅<rt>えき</rt></ruby>が あるよ）</span>`:'');
+  const dirs = G.mode==='real' ? ['up','down'] : [needDir()];
+  let html='';
+  for(const dir of dirs){
+    // 終点方向には出発できない
+    if((dir==='up'&&G.curSta===0)||(dir==='down'&&G.curSta===6)) continue;
+    html += `<div class="tt-dir"><h3>${dirRb(dir)}　${rb(DIR_DEST[dir])}ゆき</h3><div class="tt-grid">`;
+    for(const h of HOURS){
+      const cells=[];
+      for(const type of (showExp?['local','exp']:['local'])){
+        // 急行が停まらない駅では急行は選べない
+        if(type==='exp' && !EXP_STOPS.has(G.curSta)) continue;
+        for(const m of PAT[G.ttTab][dir][type]) cells.push({m,type});
+      }
+      cells.sort((a,b)=>a.m-b.m);
+      if(!cells.length) continue;
+      html += `<div class="tt-row"><div class="tt-hour">${h}</div><div class="tt-mins">`;
+      for(const c of cells){
+        const t=h*60+c.m;
+        const past = t < G.clock+1;
+        html += `<button class="tt-cell ${c.type==='exp'?'exp':''} ${past?'past':''}" `+
+          `data-time="${t}" data-dir="${dir}" data-type="${c.type}">`+
+          `${String(c.m).padStart(2,'0')}${c.type==='exp'?'<span class="k">急</span>':''}</button>`;
+      }
+      html += `</div></div>`;
+    }
+    html += `</div></div>`;
+  }
+  $('#tt-body').innerHTML=html;
+  for(const el of document.querySelectorAll('.tt-cell')) el.addEventListener('click',()=>pickCell(el));
+}
+
+function pickCell(el){
+  const t=+el.dataset.time, dir=el.dataset.dir, type=el.dataset.type;
+  if(t < G.clock+1){
+    sndSoft();
+    modal('past','⏰',`その でんしゃは もう <ruby>行<rt>い</rt></ruby>ってしまいました。<br>いまの <ruby>時刻<rt>じこく</rt></ruby>（<b>${fmt(G.clock)}</b>）より あとの <ruby>時刻<rt>じこく</rt></ruby>を えらぼう。`,'わかった');
+    return;
+  }
+  modal('confirm','🚃',
+    `<b>${fmt(t)}</b> の ${dirRb(dir)} ${typeRb(type)}<br>（${rb(DIR_DEST[dir])}ゆき）に のりますか？`,
+    'のる！', ()=>{
+      const exists = fullSchedule(G.dayType).some(x=>x.time===t&&x.dir===dir&&x.type===type);
+      G.planned={time:t, dir, type, exists, handled:false};
+      showPlatform();
+    }, 'やめる');
+}
+
+/* テスト補助：条件に合う未来の便を選んで確定 */
+window.__pickTrain = function(dir,type){
+  const cells=[...document.querySelectorAll('.tt-cell')]
+    .filter(c=>c.dataset.dir===dir&&c.dataset.type===type&&(+c.dataset.time)>=G.clock+1)
+    .sort((a,b)=>a.dataset.time-b.dataset.time);
+  if(!cells.length) return false;
+  cells[0].click(); $('#modal-ok').click(); return true;
+};
+
+/* ============ ホーム ============ */
+function showPlatform(){
+  G.state='PLATFORM';
+  G.platform={train:null, timer:0};
+  const p=G.planned;
+  $('#plat-banner').innerHTML =
+    `のる でんしゃ：<b>${fmt(p.time)}</b> ${dirRb(p.dir)} ${typeRb(p.type)}（${rb(DIR_DEST[p.dir])}ゆき）<br>` +
+    `ホームで <ruby>待<rt>ま</rt></ruby>ちましょう。でんしゃが <ruby>来<rt>き</rt></ruby>たら「のる」を タップ！`;
+  $('#plat-mark').innerHTML=`${rb(G.curSta)}<ruby>駅<rt>えき</rt></ruby>`;
+  $('#train').style.left='110%';
+  $('#train-label').textContent='';
+  $('#btn-board').disabled=true;
+  show('s-platform');
+  updateHdr();
+}
+$('#btn-open-tt').addEventListener('click',()=>showTT(false));
+$('#btn-ff').addEventListener('click',()=>{
+  if(G.platform.train) return;
+  const nx=nextPlatformEvent();
+  if(nx) G.clock=Math.max(G.clock, nx.time-0.6);
+});
+$('#btn-board').addEventListener('click',()=>{
+  const tr=G.platform.train;
+  if(!tr||tr.passing) return;
+  sndDoor();
+  startRide(tr);
+});
+
+function platformEvents(){
+  let all=fullSchedule(G.dayType);
+  if(G.mode==='normal'){
+    const dir=needDir();
+    all=all.filter(t=>t.type==='local'&&t.dir===dir);
+  }
+  all=all.filter(t=>!(t.dir==='up'&&G.curSta===0)&&!(t.dir==='down'&&G.curSta===6));
+  return all.map(t=>({...t, passing: t.type==='exp'&&!EXP_STOPS.has(G.curSta)}));
+}
+function nextPlatformEvent(){
+  return platformEvents().find(t=>t.time>=G.clock) || null;
+}
+function matchesPlanned(t){
+  const p=G.planned;
+  return p && t.time===p.time && t.dir===p.dir && t.type===p.type;
+}
+
+function tickPlatform(dt){
+  const pf=G.platform;
+  if(pf.train){
+    pf.timer-=dt;
+    if(pf.timer<=0) departTrain();
+    return;
+  }
+  // 待ち時間の経過（1実秒 = ゲーム内20秒）。次の電車の到着時刻でクランプする
+  const nx=nextPlatformEvent();
+  G.clock += dt/1000 * (20/60);
+  if(nx && G.clock >= nx.time-0.3){
+    G.clock = nx.time-0.3;
+    arriveTrain(nx);
+    return;
+  }
+  // 「選んだ電車が実は存在しない」（平日/土日の欄を読み違えた）
+  const p=G.planned;
+  if(p && !p.exists && !p.handled && G.clock > p.time+0.5){
+    p.handled=true; sndSoft();
+    modal('wrongTab','🤔',
+      `あれ？ でんしゃが <ruby>来<rt>き</rt></ruby>ません…<br>` +
+      `きょうは <b>${G.dayType==='weekday'?'<ruby>平日<rt>へいじつ</rt></ruby>':'<ruby>土日<rt>どにち</rt></ruby>'}</b>です。<br>` +
+      `<ruby>時刻表<rt>じこくひょう</rt></ruby>の <ruby>欄<rt>らん</rt></ruby>を もういちど たしかめよう！`,
+      '時刻表を見る', ()=>showTT(false));
+    return;
+  }
+}
+function arriveTrain(t){
+  G.platform.train=t;
+  G.platform.timer = t.passing ? 2600 : 6500;
+  const tr=$('#train');
+  tr.classList.toggle('exp', t.type==='exp');
+  tr.style.left = t.passing ? '-60%' : '50%';
+  if(!t.passing) tr.style.transform='translateX(-50%)'; else tr.style.transform='';
+  $('#train-label').innerHTML = t.passing
+    ? `⚠️ ${typeRb('exp')}が <ruby>通過<rt>つうか</rt></ruby>します（のれません）`
+    : `${fmt(t.time)}　${dirRb(t.dir)} ${typeRb(t.type)}　${rb(DIR_DEST[t.dir])}ゆき`;
+  $('#btn-board').disabled = !!t.passing;
+  if(!t.passing) sndBell(); else sndChime();
+}
+function departTrain(){
+  const t=G.platform.train;
+  G.platform.train=null;
+  $('#train').style.left='110%'; $('#train').style.transform='';
+  $('#train-label').textContent='';
+  $('#btn-board').disabled=true;
+  G.clock=Math.max(G.clock, t.time+0.3);
+  if(!t.passing && matchesPlanned(t)){
+    // 乗り過ごし
+    G.counters.miss++;
+    G.planned.handled=true;
+    sndSoft();
+    modal('miss','💨',
+      `あっ、でんしゃが <ruby>行<rt>い</rt></ruby>ってしまった…<br>` +
+      `だいじょうぶ、もう<ruby>一度<rt>いちど</rt></ruby> やってみよう！<br>` +
+      `<ruby>時刻表<rt>じこくひょう</rt></ruby>で <ruby>次<rt>つぎ</rt></ruby>の でんしゃを えらぼう。`,
+      '時刻表を見る', ()=>showTT(false));
+  }
+}
+
+/* ============ 乗車中 ============ */
+function startRide(tr){
+  G.state='RIDE';
+  G.platform.train=null;
+  G.ride={
+    dir:tr.dir, type:tr.type, pos:G.curSta, from:G.curSta,
+    phase:'depart', t:1400, dirChecked:false,
+    flags:{over:false, type:false, dir:false},
+  };
+  $('#ride-banner').innerHTML =
+    `${dirRb(tr.dir)} ${typeRb(tr.type)}（${rb(DIR_DEST[tr.dir])}ゆき）に <ruby>乗車中<rt>じょうしゃちゅう</rt></ruby><br>` +
+    `🎯 ${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>で 「おりる」を タップしよう`;
+  renderRoute();
+  setAnnounce(`🔔 まもなく <ruby>発車<rt>はっしゃ</rt></ruby>します`);
+  $('#btn-alight').disabled=true;
+  show('s-ride');
+  updateHdr();
+}
+function renderRoute(){
+  const r=G.ride;
+  let html='<div class="rline"></div>';
+  for(let i=0;i<STATIONS.length;i++){
+    html+=`<div class="sta ${EXP_STOPS.has(i)?'expstop':''} ${i===G.trip.to?'target':''} ${i===r.pos?'here':''}">`+
+      `<div class="dot"></div><div class="nm">${rb(i)}</div></div>`;
+  }
+  html+=`<div id="ride-train" style="left:${routeX(r.pos)}%">🚃</div>`;
+  $('#route').innerHTML=html;
+}
+function routeX(pos){ return 4 + pos*(92/(STATIONS.length-1)); }
+function setAnnounce(html){ $('#announce').innerHTML=html; }
+
+function tickRide(dt){
+  const r=G.ride; if(!r) return;
+  r.t-=dt;
+  if(r.t>0) return;
+  const d = r.dir==='up' ? -1 : 1;
+  if(r.phase==='depart'||r.phase==='stop'||r.phase==='pass'){
+    // 発車 → 移動へ
+    if(r.phase==='stop' && r.pos===G.trip.to && !r.flags.over){
+      // 目的の駅で降りそこねた
+      r.flags.over=true;
+    }
+    r.phase='moving'; r.t=3200;
+    const next=r.pos+d;
+    const stops = r.type==='local'||EXP_STOPS.has(next);
+    sndChime();
+    setAnnounce(stops
+      ? `🔊 つぎは <b>${rb(next)}</b>、${rb(next)} です`
+      : `🔊 ${rb(next)}<ruby>駅<rt>えき</rt></ruby>には とまりません（<ruby>通過<rt>つうか</rt></ruby>）`);
+    $('#btn-alight').disabled=true;
+  } else if(r.phase==='moving'){
+    r.pos+=d; G.clock+=2;
+    renderRoute();
+    if(!r.dirChecked){
+      r.dirChecked=true;
+      if(Math.abs(r.pos-G.trip.to) > Math.abs(r.from-G.trip.to)) r.flags.dir=true;
+    }
+    const stops = r.type==='local'||EXP_STOPS.has(r.pos);
+    const terminal = r.pos===0||r.pos===6;
+    if(r.type==='exp' && !stops && r.pos===G.trip.to){
+      // 目的の駅を急行が通過
+      r.flags.type=true;
+    }
+    if(stops||terminal){
+      r.phase='stop'; r.t=6500; G.clock+=0.5;
+      sndDoor();
+      setAnnounce(`🚉 <b>${rb(r.pos)}</b> です。ドアが ひらきます`);
+      $('#btn-alight').disabled=false;
+      if(r.flags.dir||r.flags.type||r.flags.over){ forcedAlightModal(); }
+      else if(terminal){
+        if(r.pos===G.trip.to){
+          modal('terminal','🎉',`<ruby>終点<rt>しゅうてん</rt></ruby>、${rb(r.pos)}です。とうちゃく！`,'おりる',()=>alightAt(r.pos));
+        } else {
+          modal('terminal','🚏',`ここは <ruby>終点<rt>しゅうてん</rt></ruby>の ${rb(r.pos)}です。<br>いったん おりましょう。`,'おりる',()=>alightAt(r.pos));
+        }
+      }
+    } else {
+      r.phase='pass'; r.t=1400;
+      setAnnounce(`💨 ${rb(r.pos)}を <ruby>通過<rt>つうか</rt></ruby>…`);
+      $('#btn-alight').disabled=true;
+    }
+  }
+}
+function forcedAlightModal(){
+  const r=G.ride; sndSoft();
+  let msg;
+  if(r.flags.dir){
+    G.counters.dir++; r.flags.dir=false; r.flags.over=false; r.flags.type=false;
+    msg=`あれれ、<ruby>反対<rt>はんたい</rt></ruby><ruby>方向<rt>ほうこう</rt></ruby>の でんしゃ だったみたい…<br>だいじょうぶ、ここで おりて もどろう！`;
+  } else if(r.flags.type){
+    G.counters.type++; r.flags.type=false; r.flags.over=false;
+    msg=`${typeRb('exp')}は ${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>に とまりません でした…<br>だいじょうぶ、ここで おりて もどろう！`;
+  } else {
+    G.counters.over++; r.flags.over=false;
+    msg=`${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>を <ruby>過<rt>す</rt></ruby>ぎてしまった…<br>だいじょうぶ、ここで おりて もどろう！`;
+  }
+  modal('forced','😊',msg,'ここで おりる',()=>alightAt(G.ride.pos));
+}
+$('#btn-alight').addEventListener('click',()=>{
+  const r=G.ride;
+  if(!r||r.phase!=='stop'||G.modalOpen) return;
+  sndDoor();
+  alightAt(r.pos);
+});
+function alightAt(s){
+  G.curSta=s; G.ride=null; G.clock+=0.5;
+  if(s===G.trip.to){
+    sndGood();
+    if(G.trip.phase==='out') showErrand();
+    else showResult();
+  } else {
+    showTT(true);   // 救済フロー：同じ時刻表UIを再利用
+  }
+}
+
+/* ============ 用事 ============ */
+function showErrand(){
+  G.state='ERRAND';
+  G.errand={timer:5000, total:5000, done:false};
+  $('#errand-banner').innerHTML=`🎉 ${rb(G.dest)}<ruby>駅<rt>えき</rt></ruby>に とうちゃく！ おかいものを しよう。`;
+  $('#errand-bar').style.width='0%';
+  $('#errand-note').textContent='ようじを すませています…';
+  $('#errand-art').textContent='🛍️';
+  $('#btn-errand-done').style.display='none';
+  show('s-errand');
+  updateHdr();
+}
+const ERRAND_ARTS=['🛍️','🍞','📚','🧃','🎁'];
+function tickErrand(dt){
+  const e=G.errand; if(e.done) return;
+  e.timer-=dt;
+  const p=1-Math.max(0,e.timer)/e.total;
+  $('#errand-bar').style.width=(p*100)+'%';
+  $('#errand-art').textContent=ERRAND_ARTS[Math.min(ERRAND_ARTS.length-1,Math.floor(p*ERRAND_ARTS.length))];
+  if(e.timer<=0){
+    e.done=true;
+    G.clock+=30;  // ゲーム内30分経過
+    if(G.mode==='normal'){
+      sndChime();
+      modal('gohome','🕒',
+        `30<ruby>分<rt>ぷん</rt></ruby> たちました。そろそろ <ruby>帰<rt>かえ</rt></ruby>りましょう。<br><ruby>帰<rt>かえ</rt></ruby>りの <ruby>時刻表<rt>じこくひょう</rt></ruby>を <ruby>見<rt>み</rt></ruby>てみよう。`,
+        '時刻表を見る', startReturn);
+    } else {
+      $('#errand-note').textContent='ようじが おわりました！';
+      $('#btn-errand-done').style.display='';
+      sndGood();
+    }
+  }
+}
+$('#btn-errand-done').addEventListener('click',startReturn);
+function startReturn(){
+  G.trip={phase:'back', to:HOME};
+  showTT(false);
+}
+
+/* ============ リザルト ============ */
+function showResult(){
+  G.state='RESULT';
+  const c=G.counters;
+  const errs=c.miss+c.over+c.type+c.dir;
+  const elapsed=Math.round(G.clock-G.startClock);
+  const title = errs===0 ? '🥇 でんしゃマスター！'
+              : errs<=2 ? '🥈 りっぱな のりもの<ruby>名人<rt>めいじん</rt></ruby>'
+              : '🥉 あきらめない チャレンジャー！';
+  const cmt = errs===0 ? 'かんぺき！ ひとりで でんしゃに のれたね！'
+            : 'しっぱいしても さいごまで たどりつけたのが すごい！';
+  $('#title-badge').innerHTML=title;
+  $('#result-table').innerHTML=
+    `<tr><td>のりすごし（のりそこね）</td><td>${c.miss} かい</td></tr>`+
+    `<tr><td>おりわすれ</td><td>${c.over} かい</td></tr>`+
+    (G.mode==='real'?`<tr><td>${typeRb('exp')}の のりまちがい</td><td>${c.type} かい</td></tr>`+
+    `<tr><td><ruby>方向<rt>ほうこう</rt></ruby>の のりまちがい</td><td>${c.dir} かい</td></tr>`:'')+
+    `<tr><td>かかった <ruby>時間<rt>じかん</rt></ruby></td><td>${Math.floor(elapsed/60)}じかん${elapsed%60}ぷん</td></tr>`+
+    `<tr><td colspan="2" style="text-align:center">${cmt}</td></tr>`;
+  sndGood();
+  show('s-result');
+  updateHdr();
+}
+$('#btn-again').addEventListener('click',()=>location.reload());
+
+/* ============ メインループ ============ */
+let last=performance.now();
+setInterval(()=>{
+  const now=performance.now();
+  let dt=(now-last)*TS; last=now;
+  dt=Math.min(dt, 2000*TS);
+  if(!G.modalOpen){
+    if(G.state==='PLATFORM') tickPlatform(dt);
+    else if(G.state==='RIDE') tickRide(dt);
+    else if(G.state==='ERRAND') tickErrand(dt);
+  }
+  updateHdr();
+},50);
+
+/* ダブルタップズーム防止 */
+let lastTouch=0;
+document.addEventListener('touchend',e=>{
+  const t=Date.now();
+  if(t-lastTouch<350) e.preventDefault();
+  lastTouch=t;
+},{passive:false});
+document.addEventListener('gesturestart',e=>e.preventDefault());
+</script>
+</body>
+</html>
