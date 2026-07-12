@@ -152,7 +152,7 @@
   .sta .nm{font-size:.62rem; text-align:center; line-height:1.15; word-break:keep-all;}
   .sta.target .dot{background:var(--yellow);}
   .sta.here .dot{box-shadow:0 0 0 5px rgba(245,197,66,.55);}
-  #ride-train{position:absolute; top:-2px; font-size:1.7rem; transition:left .9s ease; z-index:2;}
+  #ride-train{position:absolute; top:-2px; font-size:1.7rem; transition:left .9s ease; z-index:2; transform:translateX(-50%);}
   #announce{
     min-height:74px; background:var(--banner); border:2px solid var(--banner-b); color:var(--ink);
     border-radius:12px; display:flex; align-items:center; justify-content:center; text-align:center;
@@ -639,14 +639,27 @@ function showPlatform(opts){
   $('#plat-mark').innerHTML=`${rb(G.curSta)}<ruby>駅<rt>えき</rt></ruby>`;
   $('#up-dest-label').innerHTML = ttDirsAvailable('up') ? `（${rb(DIR_DEST.up)}ゆき）` : '（この駅始発ではありません）';
   $('#down-dest-label').innerHTML = ttDirsAvailable('down') ? `（${rb(DIR_DEST.down)}ゆき）` : '（この駅始発ではありません）';
-  $('#track-up').style.display = ttDirsAvailable('up')?'':'none';
-  $('#track-down').style.display = ttDirsAvailable('down')?'':'none';
+  if(G.mode==='normal'){
+    // ふつうモードは方向を選ぶ必要がないので、進行方向の線路のみ表示する
+    const dir=needDir();
+    $('#track-up').style.display = dir==='up' ? '' : 'none';
+    $('#track-down').style.display = dir==='down' ? '' : 'none';
+  } else {
+    $('#track-up').style.display = ttDirsAvailable('up')?'':'none';
+    $('#track-down').style.display = ttDirsAvailable('down')?'':'none';
+  }
   $('#track-up').classList.add('dir-up'); $('#track-down').classList.add('dir-down');
   if(!opts.keepTrains){
+    // 上りは右側から来て左側へ抜ける、下りは左側から来て右側へ抜ける
     for(const d of ['up','down']){
-      $('#train-'+d).style.left = d==='up' ? '-60%' : '110%';
+      $('#train-'+d).style.transition='none';
+      $('#train-'+d).style.left = d==='up' ? '110%' : '-60%';
+      $('#train-'+d).style.transform='';
       $('#train-'+d+'-label').textContent='';
     }
+    // 強制リフローしてtransitionを再有効化
+    void $('#train-up').offsetWidth;
+    $('#train-up').style.transition=''; $('#train-down').style.transition='';
   }
   $('#btn-board').disabled=true;
   G.platform.boardable=null;
@@ -729,8 +742,15 @@ function arriveTrain(dir, t){
   G.platform[dir+'Timer'] = t.passing ? 2600 : 6500;
   const tr=$('#train-'+dir);
   tr.classList.toggle('exp', t.type==='exp');
-  const stoppedLeft = dir==='up' ? '50%' : '50%';
-  tr.style.left = t.passing ? (dir==='up'?'-60%':'110%') : stoppedLeft;
+  // 上りは右側から、下りは左側から必ず来るように、開始位置を強制してからアニメーションする
+  const startPos = dir==='up' ? '110%' : '-60%';
+  tr.style.transition='none';
+  tr.style.left = startPos;
+  tr.style.transform='';
+  void tr.offsetWidth; // 強制リフロー
+  tr.style.transition='';
+  const goalLeft = t.passing ? (dir==='up'?'-60%':'110%') : '50%';
+  tr.style.left = goalLeft;
   tr.style.transform = t.passing ? '' : 'translateX(-50%)';
   $('#train-'+dir+'-label').innerHTML = t.passing
     ? `⚠️ ${typeRb('exp')}が <ruby>通過<rt>つうか</rt></ruby>します（のれません）`
@@ -748,6 +768,7 @@ function departTrain(dir){
   if(!t) return;
   G.platform[dir]=null;
   const tr=$('#train-'+dir);
+  // 到着したのと同じ方向へ、さらに進んで抜けていく（上り→左へ、下り→右へ）
   tr.style.left = dir==='up' ? '-60%' : '110%';
   tr.style.transform='';
   $('#train-'+dir+'-label').textContent='';
@@ -790,13 +811,25 @@ function renderRoute(){
   const r=G.ride;
   let html='<div class="rline"></div>';
   for(let i=0;i<STATIONS.length;i++){
-    html+=`<div class="sta ${EXP_STOPS.has(i)?'expstop':''} ${i===G.trip.to?'target':''} ${i===r.pos?'here':''}">`+
+    html+=`<div class="sta ${EXP_STOPS.has(i)?'expstop':''} ${i===G.trip.to?'target':''} ${i===r.pos?'here':''}" data-idx="${i}">`+
       `<div class="dot"></div><div class="nm">${rb(i)}</div></div>`;
   }
-  html+=`<div id="ride-train" style="left:${routeX(r.pos)}%">🚃</div>`;
+  html+=`<div id="ride-train">🚃</div>`;
   $('#route').innerHTML=html;
+  positionRideTrain();
 }
-function routeX(pos){ return 4 + pos*(92/(STATIONS.length-1)); }
+function positionRideTrain(){
+  const r=G.ride; if(!r) return;
+  const dotEl = document.querySelector(`.sta[data-idx="${r.pos}"] .dot`);
+  const routeEl = $('#route');
+  const trainEl = $('#ride-train');
+  if(!dotEl || !routeEl || !trainEl) return;
+  const dotRect = dotEl.getBoundingClientRect();
+  const routeRect = routeEl.getBoundingClientRect();
+  const centerX = dotRect.left + dotRect.width/2 - routeRect.left;
+  trainEl.style.left = centerX + 'px';
+}
+window.addEventListener('resize', ()=>{ if(G.state==='RIDE') positionRideTrain(); });
 function setAnnounce(html){ $('#announce').innerHTML=html; }
 
 function tickRide(dt){
@@ -856,25 +889,25 @@ function tickRide(dt){
     }
   }
 }
-/* エラー分岐：まず「まだ着いていません」を表示 → ボタン操作 → 「次の電車に乗れます」の2段階 */
+/* エラー分岐：まず「まちがえたこと／まだ着いていません」を表示 → ボタン操作 → 「次の電車に乗れます」の2段階 */
 function forcedAlightModal(){
   const r=G.ride; sndSoft();
   let msg1, counterFn;
   if(r.flags.dir){
     counterFn=()=>{G.counters.dir++;};
-    msg1=`あれれ、<ruby>反対<rt>はんたい</rt></ruby><ruby>方向<rt>ほうこう</rt></ruby>の でんしゃ だったみたい…<br>` +
-         `${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>には まだ ついていないよ。`;
+    msg1=`❌ <ruby>反対<rt>はんたい</rt></ruby><ruby>方向<rt>ほうこう</rt></ruby>の でんしゃに のってしまったよ。<br>`+
+         `😯 ${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>には まだ ついていません。`;
   } else if(r.flags.type){
     counterFn=()=>{G.counters.type++;};
-    msg1=`${typeRb('exp')}は ${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>に とまりません でした…<br>` +
-         `${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>には まだ ついていないよ。`;
+    msg1=`❌ ${typeRb('exp')}に のったので、${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>で とまれなかったよ。<br>`+
+         `😯 ${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>には まだ ついていません。`;
   } else {
     counterFn=()=>{G.counters.over++;};
-    msg1=`${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>を <ruby>過<rt>す</rt></ruby>ぎてしまった…<br>` +
-         `${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>には まだ ついていないよ。`;
+    msg1=`❌ おりるのを わすれて、${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>を <ruby>過<rt>す</rt></ruby>ぎてしまったよ。<br>`+
+         `😯 ${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>には まだ ついていません。`;
   }
   r.flags.dir=false; r.flags.type=false; r.flags.over=false;
-  modal('notYet','😊', msg1, 'つぎは どうする？', ()=>{
+  modal('notYet','😲', msg1, 'つぎは どうする？', ()=>{
     counterFn();
     sndSoft();
     modal('canBoard','🚃',
