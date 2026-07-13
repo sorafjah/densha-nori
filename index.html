@@ -138,6 +138,11 @@
   .tk-train .carbody::before{content:""; position:absolute; left:8%; right:8%; top:18%; height:38%; background:#dff0fb; border-radius:5px;}
   .tk-label-run{position:absolute; top:62%; left:0; right:0; text-align:center; font-size:.85rem; font-weight:bold; color:#123; text-shadow:0 1px 0 #fff;}
   #plat-mark{padding:6px 10px; font-size:.9rem; background:#fff; text-align:center;}
+  .ff-indicator{
+    padding:6px 10px; font-size:.9rem; text-align:center; background:#fff6d8; color:#8a6d1a;
+    display:flex; align-items:center; justify-content:center; gap:4px;
+  }
+  .ff-indicator .pip{background:#8a6d1a;}
   .btnrow{display:flex; gap:10px; flex-wrap:wrap;}
   .btnrow button{flex:1;}
   .pip{display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--yellow); margin:0 2px; animation:pipfade 1s ease-in-out infinite;}
@@ -254,11 +259,13 @@
         <div class="tk-label-run" id="train-down-label"></div>
       </div>
       <div id="plat-mark"></div>
+      <div id="ff-indicator" class="ff-indicator" style="display:none">⏩ <ruby>早送<rt>はやおく</rt></ruby>り<ruby>中<rt>ちゅう</rt></ruby><span class="pip"></span><span class="pip"></span><span class="pip"></span></div>
     </div>
     <div class="btnrow">
       <button class="big green" id="btn-board" disabled>🚪 のる</button>
     </div>
     <div class="btnrow">
+      <button class="ghost" id="btn-ff">⏩ <ruby>早送<rt>はやおく</rt></ruby>り</button>
       <button class="ghost" id="btn-open-tt">📋 <ruby>時刻表<rt>じこくひょう</rt></ruby>を<ruby>見<rt>み</rt></ruby>る</button>
     </div>
   </div>
@@ -487,10 +494,8 @@ function renderLineMap(){
   html+='</div>';
   $('#linemap').innerHTML=html;
   $('#lm-legend').innerHTML=
-    `<span class="lg"><span class="sw hereex"></span>いま いる <ruby>駅<rt>えき</rt></ruby></span>`+
     `<span class="lg"><span class="sw" style="border-color:var(--blue)"></span>${typeRb('local')}のみ <ruby>停車<rt>ていしゃ</rt></ruby></span>`+
-    `<span class="lg"><span class="sw exp"></span>${typeRb('exp')}も <ruby>停車<rt>ていしゃ</rt></ruby></span>`+
-    `<span class="lg">🎯 もくてきち：${rb(G.trip.to)}<ruby>駅<rt>えき</rt></ruby>（${EXP_STOPS.has(G.trip.to)?typeRb('exp')+'も とまる':typeRb('exp')+'は とおりすぎる'}）</span>`;
+    `<span class="lg"><span class="sw exp"></span>${typeRb('exp')}も <ruby>停車<rt>ていしゃ</rt></ruby></span>`;
 }
 
 /* ============ 時刻表 ============ */
@@ -662,6 +667,7 @@ function showPlatform(opts){
     $('#train-up').style.transition=''; $('#train-down').style.transition='';
   }
   $('#btn-board').disabled=true;
+  $('#ff-indicator').style.display='none';
   G.platform.boardable=null;
   show('s-platform');
   updateHdr();
@@ -675,6 +681,7 @@ $('#btn-board').addEventListener('click',()=>{
 });
 
 function platformEventsForDir(dir){
+  if(G.mode==='normal' && dir!==needDir()) return []; // ふつうモードは進行方向のみを対象にする
   let all=fullSchedule(G.dayType).filter(t=>t.dir===dir);
   if(G.mode==='normal') all=all.filter(t=>t.type==='local');
   if(!ttDirsAvailable(dir)) return [];
@@ -721,13 +728,41 @@ function tickPlatformStep(dt){
     }
   }
   if(arrivedSomething) return;
-  // 待ち時間の経過（1実秒 = ゲーム内20秒）。次の電車の到着時刻でクランプする
+
   const cands=['up','down'].filter(ttDirsAvailable).map(nextEventFor).filter(Boolean);
   const nxTime = cands.length ? Math.min(...cands.map(t=>t.time)) : null;
-  G.clock += dt/1000 * (20/60);
-  if(nxTime!==null && G.clock >= nxTime-0.3) G.clock = nxTime-0.3;
-  // 「選んだ電車が実は存在しない」（平日/土日の欄を読み違えた）
   const p=G.planned;
+  // 「選んだ電車が実は存在しない」ケースも早送りの目標に含める（曜日欄違いの通知を飛び越えないため）
+  let clampTime = nxTime;
+  if(p && !p.exists && !p.handled){
+    clampTime = clampTime!==null ? Math.min(clampTime, p.time+0.5) : p.time+0.5;
+  }
+
+  const NORMAL_SPEED = 20/60;   // 通常速度：実1秒 = ゲーム内20秒
+  const MAX_WAIT_MS = 5000;     // 待ち始めてから実時間5秒以内に必ず到着させる
+
+  if(clampTime!==null && clampTime > G.clock){
+    if(pf.ffTarget !== clampTime){
+      // 待ち始めの時点で、到着までの所要時間（実時間）を一度だけ確定する
+      pf.ffTarget = clampTime;
+      pf.ffStartClock = G.clock;
+      pf.ffElapsed = 0;
+      const remainMin = clampTime - G.clock;
+      const normalMsNeeded = remainMin / NORMAL_SPEED * 1000;
+      pf.ffDuration = Math.min(normalMsNeeded, MAX_WAIT_MS);
+      pf.fastForward = normalMsNeeded > MAX_WAIT_MS;
+    }
+    pf.ffElapsed += dt;
+    const progress = pf.ffDuration>0 ? Math.min(1, pf.ffElapsed / pf.ffDuration) : 1;
+    G.clock = pf.ffStartClock + (pf.ffTarget - pf.ffStartClock) * progress;
+  } else {
+    pf.fastForward = false; pf.ffTarget=null;
+  }
+  // 次の電車の到着直前でクランプ（電車自体の到着処理は次のstepで行う）
+  if(nxTime!==null && G.clock >= nxTime-0.3) G.clock = nxTime-0.3;
+  $('#ff-indicator').style.display = pf.fastForward ? 'flex' : 'none';
+
+  // 「選んだ電車が実は存在しない」（平日/土日の欄を読み違えた）
   if(p && !p.exists && !p.handled && G.clock > p.time+0.5){
     p.handled=true; sndSoft();
     modal('wrongTab','🤔',
@@ -737,7 +772,23 @@ function tickPlatformStep(dt){
       '時刻表を見る', ()=>showTT({isRescue:false, fromPlatform:true}));
   }
 }
+$('#btn-ff').addEventListener('click',()=>{
+  const pf=G.platform;
+  if(pf.up || pf.down) return; // 電車が既にホームにいる時は無効
+  const cands=['up','down'].filter(ttDirsAvailable).map(nextEventFor).filter(Boolean);
+  const nxTime = cands.length ? Math.min(...cands.map(t=>t.time)) : null;
+  const p=G.planned;
+  let clampTime = nxTime;
+  if(p && !p.exists && !p.handled){
+    clampTime = clampTime!==null ? Math.min(clampTime, p.time+0.5) : p.time+0.5;
+  }
+  if(clampTime===null) return;
+  pf.ffTarget=null; pf.fastForward=false;
+  G.clock = (nxTime!==null && clampTime===nxTime) ? nxTime-0.3 : clampTime;
+});
 function arriveTrain(dir, t){
+  G.platform.fastForward=false; G.platform.ffTarget=null;
+  $('#ff-indicator').style.display='none';
   G.platform[dir]=t;
   G.platform[dir+'Timer'] = t.passing ? 2600 : 6500;
   const tr=$('#train-'+dir);
