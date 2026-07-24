@@ -554,7 +554,8 @@ function buildDirGridHTML(day, dir){
     html += `<div class="tt-row"><div class="tt-hour">${h}</div><div class="tt-mins">`;
     for(const c of cells){
       const t=h*60+c.m;
-      const past = t < G.clock+1;
+      // リアルモードは過去の便も選べるので通常表示、ふつうモードは選べないためグレーアウトする
+      const past = G.mode!=='real' && t < G.clock+1;
       html += `<button class="tt-cell ${c.type==='exp'?'exp':''} ${past?'past':''}" `+
         `data-day="${day}" data-time="${t}" data-dir="${dir}" data-type="${c.type}">`+
         `${String(c.m).padStart(2,'0')}${c.type==='exp'?'<span class="k">急</span>':''}</button>`;
@@ -597,14 +598,18 @@ function renderTT(){
 
 function pickCell(el){
   const t=+el.dataset.time, dir=el.dataset.dir, type=el.dataset.type, day=el.dataset.day;
-  if(t < G.clock+1){
+  const isPast = t < G.clock+1;
+  if(isPast && G.mode!=='real'){
+    // ふつうモードは今まで通り、過去の便は選べない
     sndSoft();
     modal('past','⏰',`その でんしゃは もう <ruby>行<rt>い</rt></ruby>ってしまいました。<br>いまの <ruby>時刻<rt>じこく</rt></ruby>（<b>${fmt(G.clock)}</b>）より あとの <ruby>時刻<rt>じこく</rt></ruby>を えらぼう。`,'わかった');
     return;
   }
   // その曜日欄で、今より前にあり・かつこの電車より早く来る「乗れる電車」があるか確認
-  let earlierNote='';
-  if(day===G.dayType){
+  let earlierNote='', pastNote='';
+  if(isPast){
+    pastNote = `<br><span style="color:#a3591a">⚠️ この でんしゃは、いまの <ruby>時刻<rt>じこく</rt></ruby>（<b>${fmt(G.clock)}</b>）より <ruby>前<rt>まえ</rt></ruby>に しゅっぱつする でんしゃだよ。</span>`;
+  } else if(day===G.dayType){
     const earlier=fullSchedule(G.dayType).filter(x=>x.dir===dir && x.time>=G.clock+1 && x.time<t &&
       !(x.type==='exp' && !EXP_STOPS.has(G.curSta)));
     if(earlier.length){
@@ -612,10 +617,10 @@ function pickCell(el){
     }
   }
   modal('confirm','🚃',
-    `<b>${fmt(t)}</b> の ${dirRb(dir)} ${typeRb(type)}<br>（${rb(DIR_DEST[dir])}ゆき）に のりますか？${earlierNote}`,
+    `<b>${fmt(t)}</b> の ${dirRb(dir)} ${typeRb(type)}<br>（${rb(DIR_DEST[dir])}ゆき）に のりますか？${pastNote}${earlierNote}`,
     'のる！', ()=>{
       const exists = day===G.dayType && fullSchedule(G.dayType).some(x=>x.time===t&&x.dir===dir&&x.type===type);
-      G.planned={time:t, dir, type, exists, handled:false};
+      G.planned={time:t, dir, type, exists, handled:false, alreadyDeparted:isPast};
       showPlatform({keepTrains:false});
     }, 'やめる');
 }
@@ -628,6 +633,17 @@ window.__pickTrain = function(dir,type,day){
     .sort((a,b)=>a.dataset.time-b.dataset.time);
   if(!cells.length) return false;
   cells[0].click(); $('#modal-ok').click(); return true;
+};
+/* テスト補助：過去（もう出発済み）の便をあえて選ぶ */
+window.__pickPastTrain = function(dir,type,day){
+  day = day || G.dayType;
+  const cells=[...document.querySelectorAll('.tt-cell')]
+    .filter(c=>c.dataset.dir===dir&&c.dataset.type===type&&c.dataset.day===day&&(+c.dataset.time)<G.clock+1)
+    .sort((a,b)=>(+b.dataset.time)-(+a.dataset.time)); // 直近の過去便
+  if(!cells.length) return false;
+  cells[0].click();
+  if(!document.querySelector('#modal-bg').classList.contains('on')) return false;
+  $('#modal-ok').click(); return true;
 };
 
 /* ============ ホーム（上り/下り 二線） ============ */
@@ -707,6 +723,16 @@ function tickPlatform(dt){
 }
 function tickPlatformStep(dt){
   const pf=G.platform;
+  const p=G.planned;
+  // 「もう出発済みの電車を選んだ」場合（リアルモード）は、ホームに来てすぐ気づかせる
+  if(p && p.alreadyDeparted && !p.handled){
+    p.handled=true; sndSoft();
+    modal('alreadyGone','😅',
+      `<b>${fmt(p.time)}</b>の でんしゃは、もう <ruby>出発<rt>しゅっぱつ</rt></ruby>して いました。<br>`+
+      `いまは <b>${fmt(G.clock)}</b>です。<br>つぎに くる でんしゃを えらびなおそう。`,
+      '時刻表を見る', ()=>showTT({isRescue:false, fromPlatform:true}));
+    return;
+  }
   // ピッピッピ演出（待機中、実時間で一定間隔に鳴らす）
   if(!pf.up && !pf.down){
     pf._pipAcc=(pf._pipAcc||0)+dt;
@@ -731,7 +757,6 @@ function tickPlatformStep(dt){
 
   const cands=['up','down'].filter(ttDirsAvailable).map(nextEventFor).filter(Boolean);
   const nxTime = cands.length ? Math.min(...cands.map(t=>t.time)) : null;
-  const p=G.planned;
   // 「選んだ電車が実は存在しない」ケースも早送りの目標に含める（曜日欄違いの通知を飛び越えないため）
   let clampTime = nxTime;
   if(p && !p.exists && !p.handled){
